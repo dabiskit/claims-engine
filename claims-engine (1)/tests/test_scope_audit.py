@@ -130,3 +130,23 @@ def test_negated_disclaimer_is_not_a_therapeutic_claim():
     assert lexical_hits(main.KB.lexicon, t) == []
     assert [t2 for t2 in ("prévenir",) if any("prévenir" == "Ce collagène aide à prévenir l'arthrose."[h.start:h.end]
             for h in lexical_hits(main.KB.lexicon, "Ce collagène aide à prévenir l'arthrose."))] == ["prévenir"]
+
+
+def test_source_links_and_replacement_proposals(monkeypatch):
+    monkeypatch.setattr(main, "fetch_url", lambda url: FIXTURE)
+    main.apply_seed(official_seed())
+    try:
+        c = client_for("sugg@exemple.fr")
+        page = c.get("/app").text
+        html = c.post("/app/analyser", data={"csrf": token(page), "source": "url", "url": URL, "mode": "AUTO"}).text
+        assert "https://eur-lex.europa.eu/legal-content/FR/TXT/HTML/?uri=CELEX:32011R1169#art_7" in html   # art. 7§3 cliquable
+        assert "Proposition de remplacement" in html
+        # « prévenir la perte de densité osseuse » : allégation autorisée sur les os, utilisable avec 60 mg de vitamine C
+        assert "fonction normale des os" in html or "os normaux" in html
+        assert "food-feed-portal/screen/health-claims/eu-register" in html                              # registre cliquable
+        text = "<h2>Posologie</h2><p>2 gélules par jour avec 300 mg de magnésium contre l'anxiété.</p>"
+        html = c.post("/app/analyser", data={"csrf": token(page), "source": "texte", "text": text, "mode": "PRODUCT_PAGE"}).text
+        assert "« Conseils d&#39;utilisation »" in html                                                  # terme de substitution
+        assert "legifrance.gouv.fr/codes/article_lc/LEGIARTI000006689867" in html                        # CSP L5111-1
+    finally:
+        main.apply_seed(main.BASE_SEED)
