@@ -50,7 +50,7 @@ def test_url_analysis_is_scoped_to_product(monkeypatch):
         r = c.post("/app/analyser", data={"csrf": token(page), "source": "url", "url": URL, "mode": "AUTO"})
         assert r.status_code == 200
         html = r.text
-        assert "<h1 style=\"margin:4px 0\">Collagène Test</h1>" in html          # carte produit
+        assert "<h1>Collagène Test</h1>" in html          # carte produit
         assert "Fiche produit détectée" in html and "MarqueTest" in html
         for menu_term in ("Coupe-faim", "Ventre plat", "cardiovasculaire", "renforcement musculaire", "Livraison offerte"):
             assert menu_term not in html, menu_term                              # menus, produits suggérés, bandeaux écartés
