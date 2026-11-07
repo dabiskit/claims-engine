@@ -111,3 +111,20 @@ def test_register_stream(tmp_path, monkeypatch):
 
     recs = kb_sync.fetch_register(FakeClient())
     assert len(recs) == 600 and recs[0]["id"] == "POL-HC-0"
+
+
+def test_drafted_wording_is_corrected_by_official_text():
+    rows = kb_sync.parse_annex(annex_html())
+    rows.append({"substance_fr": "Vitamine C", "claim_fr": "La vitamine C contribue à la formation normale de collagène pour assurer le fonctionnement normal des vaisseaux sanguins",
+                 "conditions_fr": kb_sync.SOURCE if hasattr(kb_sync, "SOURCE") else "x", "restrictions_fr": "", "efsa_ref": "2009", "entry_ids": ["130"]})
+    rows.append({"substance_fr": "Vitamine C", "claim_fr": "La vitamine C contribue à la formation normale de collagène pour assurer la fonction normale des os",
+                 "conditions_fr": "x", "restrictions_fr": "", "efsa_ref": "2009", "entry_ids": ["131"]})
+    ds = kb_sync.build_dataset("02012R0432-20250820", rows, [], SEED, "2026-11-07T12:00:00+00:00")
+    seed = kb_sync.merge_seed(SEED, ds)
+    vc = {c["code"]: c for c in seed["regulatory_claims"] if c["substance"] == "VIT_C"}
+    v = vc["VIT_C-COLL-VAISSEAUX"]
+    assert v["text_fr"].endswith("le fonctionnement normal des vaisseaux sanguins") and v["text_fr_status"] == "OFFICIEL_EUR_LEX_CORRIGE"
+    assert "fonction normale des vaisseaux" in v["text_fr_draft"]
+    assert not any(c.get("origin") == "IMPORT_OFFICIEL" and "vaisseaux" in c["text_fr"] for c in vc.values())   # pas de doublon
+    assert vc["VIT_C-COLL-OS"]["source_url"].startswith("https://eur-lex")      # libellé identique : source rattachée
+    assert "fonction normale des os" in vc["VIT_C-COLL-OS"]["text_fr"]           # « os » n'a pas été confondu avec un autre libellé
