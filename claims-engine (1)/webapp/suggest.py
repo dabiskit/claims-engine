@@ -149,12 +149,14 @@ class Suggester:
         for t in topics:
             for code in self.by_topic.get(t, []):
                 (mine if code in self.usable else others).append(code)
-        mine = sorted(dict.fromkeys(mine), key=lambda c: rank.get(self.usable[c][1], 3))[:limit]
+        # une allégation dont la condition n'est pas remplie n'est pas une proposition
+        mine = sorted((c for c in dict.fromkeys(mine) if self.usable[c][1] != "red"),
+                      key=lambda c: rank.get(self.usable[c][1], 3))[:limit]
         names = list(dict.fromkeys(self.substances.get(self.claims[c]["substance"], {}).get("name_fr", "") for c in others))
         return [self._claim_view(c) for c in mine], [n for n in names if n][:6]
 
     def suggest(self, code: str, lexical_code: str | None, quote: str, node_text: str,
-                claim_code: str | None = None) -> dict | None:
+                claim_code: str | None = None, ai: dict | None = None) -> dict | None:
         q = norm(quote or "")
         entry = self.lexicon.get(lexical_code or code) or {}
         fix = TERM_FIXES.get(q)
@@ -164,7 +166,17 @@ class Suggester:
         bridge = next((b for t, b in self.bridges if t and (t == q or t in q)), None)
         if bridge and not replace_with:
             replace_with = bridge.get("legal_term")
+        ai_view, ai_rejected = None, None
+        if ai and ai.get("status") == "VALIDEE":
+            ai_view = {"action": ai["action"], "text": ai.get("text") or "", "reason": ai.get("reason"),
+                       "claim": self._claim_view(ai["claim_code"]) if ai.get("claim_code") in self.claims else None}
+        elif ai:
+            ai_rejected = ai.get("reason")
         claims: list[dict] = []
+        if ai_view and (ai_view["claim"] or ai_view["action"] in ("SUPPRIMER", "REFORMULER")):
+            # la proposition de l'IA, contrôlée, suffit : pas de liste thématique en plus
+            return {"replace_with": replace_with, "advice": None if ai_view["claim"] else advice, "claims": [], "others": [], "ai": ai_view,
+                    "ai_rejected": None}
         if claim_code and claim_code in self.claims:
             # L'IA a rapproché la phrase d'une allégation autorisée précise : c'est son libellé officiel qu'il faut reprendre.
             claims.append(self._claim_view(claim_code, "libellé officiel à reprendre tel quel"))
@@ -176,9 +188,10 @@ class Suggester:
             # thème de la citation d'abord ; à défaut (« prévenir », « leur résistance »), celui de sa phrase
             basis = quote if topics_of(quote or "") else sentence_of(quote, node_text)
             claims, others = self.claims_for(basis)
-        if not (replace_with or advice or claims or others):
+        if not (replace_with or advice or claims or others or ai_view or ai_rejected):
             return None
-        return {"replace_with": replace_with, "advice": advice, "claims": claims[:2], "others": [] if claims else others}
+        return {"replace_with": replace_with, "advice": advice, "claims": claims[:2], "others": [] if claims else others,
+                "ai": ai_view, "ai_rejected": ai_rejected}
 
 
 def dedupe_in_passage(findings: list[dict]) -> None:
@@ -201,5 +214,5 @@ def dedupe_in_passage(findings: list[dict]) -> None:
             s["others"] = []
         elif key:
             seen_others.add(key)
-        if not (s.get("replace_with") or s.get("advice") or s["claims"] or s.get("others")):
+        if not (s.get("replace_with") or s.get("advice") or s["claims"] or s.get("others") or s.get("ai")):
             f["suggestion"] = None

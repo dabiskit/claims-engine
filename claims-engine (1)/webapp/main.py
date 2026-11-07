@@ -55,6 +55,7 @@ from engine.conditions import evaluate_claim  # noqa: E402
 from engine.dom_extractor import extract_page  # noqa: E402
 from engine.mode_router import lexical_hits  # noqa: E402
 from engine.page_scope import detect_composition, isolate  # noqa: E402
+from engine import severity  # noqa: E402
 from engine.textnorm import norm  # noqa: E402
 from webapp import kb_sync  # noqa: E402
 from webapp.suggest import LEGAL_URLS, REGISTER_URL, Suggester, dedupe_in_passage, sentence_of  # noqa: E402
@@ -130,6 +131,7 @@ CODE_LABELS = {
     "IA_REDUCTION_RISQUE_NON_AUTORISEE": "Allégation de réduction d'un risque de maladie non autorisée",
     "IA_ALLEGATION_BOTANIQUE_NON_COUVERTE": "Allégation sur une plante dont les allégations « on-hold » ne sont pas encore intégrées",
     "IA_FORMULATION_NON_FIDELE": "Allégation autorisée reprise avec une formulation renforcée",
+    "IA_PROPRIETE_TECHNOLOGIQUE": "Propriété du produit ou de la matière première : allégation de santé seulement si un bénéfice est suggéré",
     "IA_REFERENCE_GENERALE": "Référence générale non accompagnée d'une allégation spécifique",
     "IA_ALLEGATION_NUTRITIONNELLE": "Allégation nutritionnelle (conditions non vérifiées par cette version)",
     "IA_INDISPONIBLE": "Extraction IA indisponible : seules les règles et le lexique ont été appliqués",
@@ -454,7 +456,25 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
     counts = {k: 0 for k in LEVELS}
     ai_error = None
     priorities = []
+    # Grille S14 : un terme du lexique compris dans un constat de l'IA du même passage est compté une fois,
+    # rattaché au constat de l'IA (qui prend le niveau le plus élevé des deux).
+    rank = {"INFO": 0, "CONDITIONNEL": 1, "ORANGE": 2, "ROUGE": 3}
+    ia_by_node: dict[str, list] = {}
     for f in analysis.findings:
+        if f.code.startswith("IA_") and f.node_key and f.quote:
+            ia_by_node.setdefault(f.node_key, []).append(f)
+    merged_terms: dict[int, list[str]] = {}
+    kept = []
+    for f in analysis.findings:
+        if not f.code.startswith("IA_") and f.node_key and f.quote and f.lexical_code:
+            host = next((g for g in ia_by_node.get(f.node_key, []) if norm(f.quote) in norm(g.quote)), None)
+            if host is not None:
+                merged_terms.setdefault(id(host), []).append(f.quote)
+                if rank.get(f.level, 0) > rank.get(host.level, 0):
+                    host.level = f.level
+                continue
+        kept.append(f)
+    for f in kept:
         if f.code == "IA_INDISPONIBLE":
             ai_error = f.quote or "erreur inconnue"
             LAST_AI_ERROR["msg"] = f"{now():%d/%m %H:%M} — {ai_error}"
@@ -465,6 +485,9 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
                 "substance": SUBSTANCES.get(f.substance or "", {}).get("name_fr"),
                 "remediations": [REMEDIATIONS.get(r, r) for r in dict.fromkeys(f.remediation_codes)],
                 "rationale": getattr(f, "rationale", None) if f.code.startswith("IA_") else None,
+                "certainty": getattr(f, "certainty", None), "terms": merged_terms.get(id(f), []),
+                "rule": (severity.rule_for(f.code) or {}).get("id") or ("S15" if f.lexical_code else None),
+                "_ai_repl": getattr(f, "replacement", None),
                 "_lex": f.lexical_code, "_node": f.node_text, "_claim": getattr(f, "claim_code", None)}
         if f.code in ("REFERENCE_GENERALE_ART10_3", "IA_REFERENCE_GENERALE") and f.node_key:
             term = norm(f.quote or "")
@@ -475,16 +498,17 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
                 g["examples"].append(f.node_text[:220])
             counts["ORANGE_REF"] = counts.get("ORANGE_REF", 0) + 1
             continue
-        counts[f.level] = counts.get(f.level, 0) + 1
         if f.node_key is None:
             page_level.append(item)
+            counts[f.level] = counts.get(f.level, 0) + 1
         else:
             key = norm(f.node_text)[:300]          # un même texte répété (menu mobile, bloc dupliqué) : une fois
             node = nodes.setdefault(key, {"text": f.node_text, "findings": [], "seen": set()})
             sig = (f.code, norm(f.quote or ""))
             if sig in node["seen"]:
-                continue
+                continue                            # compté une seule fois
             node["seen"].add(sig)
+            counts[f.level] = counts.get(f.level, 0) + 1
             node["findings"].append(item)
             if f.level == "ROUGE" and len(priorities) < 6:
                 priorities.append(item)
@@ -524,7 +548,8 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
     for n in nodes.values():
         for it in n["findings"]:
             node_text = it.pop("_node", "")
-            it["suggestion"] = sugg.suggest(it["code"], it.pop("_lex", None), it["quote"], node_text, it.pop("_claim", None))
+            it["suggestion"] = sugg.suggest(it["code"], it.pop("_lex", None), it["quote"], node_text, it.pop("_claim", None),
+                                            ai=it.pop("_ai_repl", None))
             # Preuve propre au constat : les demandes refusées par la Commission pour l'ingrédient cité dans la phrase.
             if it["code"] in unauthorised:
                 hit = next(iter(kb_sync.rejected_for(SEED, norm(sentence_of(it["quote"], node_text) + " " + product_name))), None)
@@ -534,7 +559,7 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
                                       "url": f"/app/base/refusees?q={key}"}
         dedupe_in_passage(n["findings"])
     for it in page_level:
-        it.pop("_lex", None), it.pop("_node", None), it.pop("_claim", None)
+        it.pop("_lex", None), it.pop("_node", None), it.pop("_claim", None), it.pop("_ai_repl", None)
     for g in general_refs.values():
         g["claims"], g["others"] = sugg.claims_for(g["term"] or "", limit=2)
 
@@ -949,6 +974,13 @@ T = {
 "result": """{% extends "base" %}{% block content %}
 {% macro legal(f, prefix='') %}{% if f.legal %}{{ prefix }}{% if f.legal_url %}<a href="{{ f.legal_url }}" target="_blank" rel="noopener">{{ f.legal }}</a>{% else %}{{ f.legal }}{% endif %}{% endif %}{% endmacro %}
 {% macro sug(x) %}{% if x %}<div class="suggest"><div class="suggest-title">Proposition de remplacement</div>
+{% if x.ai %}<p class="small"><span class="tag info">IA · contrôlée</span>
+{% if x.ai.action == 'SUPPRIMER' %} <strong>Supprimer ce passage</strong> : aucune allégation autorisée ne couvre ce bienfait.
+{% elif x.ai.action == 'REFORMULER' %} Reformuler en description factuelle : <strong>« {{ x.ai.text }} »</strong>
+{% else %} Remplacer par : <strong>« {{ x.ai.text }} »</strong>{% if x.ai.claim %} <span class="faint">({{ x.ai.claim.substance }}{% if x.ai.claim.status %}, {{ x.ai.claim.status|lower }}{% endif %}{% if x.ai.claim.source_url %}, <a href="{{ x.ai.claim.source_url }}" target="_blank" rel="noopener">source</a>{% endif %})</span>{% endif %}{% endif %}</p>
+{% if x.ai.claim and (x.ai.text|lower|replace('.', '')|trim) != (x.ai.claim.text|lower|replace('.', '')|trim) %}<p class="small muted">Libellé officiel : « {{ x.ai.claim.text }} » — {{ x.ai.claim.substance }}{% if x.ai.claim.status %} · <span class="tag {{ x.ai.claim.css }}">{{ x.ai.claim.status }}</span>{% endif %}{% if x.ai.claim.source_url %} · <a href="{{ x.ai.claim.source_url }}" target="_blank" rel="noopener">source</a>{% endif %}</p>{% endif %}
+{% if x.ai.reason %}<p class="faint xs">{{ x.ai.reason }}</p>{% endif %}{% endif %}
+{% if x.ai_rejected %}<p class="faint xs">Proposition de l'IA écartée par les règles : {{ x.ai_rejected }}.</p>{% endif %}
 {% if x.replace_with %}<p>Remplacer par : <strong>« {{ x.replace_with }} »</strong></p>{% endif %}
 {% if x.advice %}<p class="muted small">{{ x.advice }}</p>{% endif %}
 {% if x.claims %}<p class="small">{{ 'Libellé officiel à reprendre' if x.claims[0].why else ('Allégation' ~ ('s' if x.claims|length > 1 else '') ~ ' autorisée' ~ ('s' if x.claims|length > 1 else '') ~ ' sur ce thème, pour cette composition') }} :</p><ul class="list-plain small">{% for c in x.claims %}<li>{% if c.status %}<span class="tag {{ c.css }}">{{ c.status }}</span> {% endif %}« {{ c.text }} »{% if c.source_url %} <a class="faint" href="{{ c.source_url }}" target="_blank" rel="noopener">source</a>{% endif %}{% if not c.status %} <span class="faint">({{ c.substance }} : absent de la composition)</span>{% endif %}</li>{% endfor %}</ul>
@@ -994,9 +1026,10 @@ T = {
 {% set reds = r.nodes|selectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else r.nodes %}
 {% set others = r.nodes|rejectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else [] %}
 {% macro node_card(n) %}<article class="card"><p class="passage {{ 'red' if n.has_red }}">{{ n.html|safe }}</p>
-{% for f in n.findings %}<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{% if f.ai %}<span class="tag info">IA</span> {% endif %}<span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}
+{% for f in n.findings %}<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{% if f.ai %}<span class="tag info">IA{% if f.certainty %} · certitude {{ f.certainty|lower }}{% endif %}</span> {% endif %}<span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}
+{% if f.terms %}<div class="meta">Terme{{ 's' if f.terms|length > 1 }} du lexique en cause : {{ f.terms|join(', ') }}</div>{% endif %}
 {% if f.rationale %}<div class="meta">Analyse IA : {{ f.rationale }}</div>{% endif %}
-{% if f.legal %}<div class="meta">{{ legal(f, 'Fondement : ') }}{% if f.evidence %} · <a href="{{ f.evidence.url }}">{{ f.evidence.label }}</a>{% endif %}</div>{% endif %}
+{% if f.legal %}<div class="meta">{{ legal(f, 'Fondement : ') }}{% if f.evidence %} · <a href="{{ f.evidence.url }}">{{ f.evidence.label }}</a>{% endif %}{% if f.rule %} · <a href="/app/base/grille#{{ f.rule }}">pourquoi ce niveau ?</a>{% endif %}</div>{% endif %}
 {% if f.suggestion %}{{ sug(f.suggestion) }}{% elif f.remediations %}<div class="meta">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div></div>{% endfor %}</article>{% endmacro %}
 {% if reds %}<div class="section-title"><h2>Passages à revoir en priorité ({{ reds|length }})</h2></div>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
 {% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary><div class="stack">{% for n in others %}{{ node_card(n) }}{% endfor %}</div></details>{% endif %}
@@ -1029,7 +1062,7 @@ T = {
 <p class="muted">Release {{ release }}. {{ n_claims }} allégations autorisées, {{ rows|length }} ingrédients. Chaque élément peut recevoir votre avis ; tout est exportable depuis <a href="/app/avis">Mes avis</a>.</p>
 {% if official %}<p><span class="tag ok">Import officiel</span> Sources officielles téléchargées le {{ official.retrieved_at[:10] }} : {% for src in official.sources %}<a href="{{ src.url }}" rel="noopener" target="_blank">{{ src.name }}</a>{% if src.version %} (version du {{ src.version }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}. <a href="/app/base/sources">Détail et mise à jour</a></p>
 {% else %}<p><span class="tag orange">Import officiel non effectué</span> Seule la base rédigée (lot 1) est chargée. <a href="/app/base/sources">Sources et mise à jour</a></p>{% endif %}
-<p><a href="/app/base/lexique">Lexique des formulations à risque ({{ n_lex }})</a> · <a href="/app/base/mentions">Mentions ({{ n_notices }})</a> · <a href="/app/base/taches">Tâches de revue ({{ n_tasks }})</a>{% if n_rejected %} · <a href="/app/base/refusees">Demandes refusées ({{ n_rejected }})</a>{% endif %}</p>
+<p><a href="/app/base/lexique">Lexique des formulations à risque ({{ n_lex }})</a> · <a href="/app/base/mentions">Mentions ({{ n_notices }})</a> · <a href="/app/base/taches">Tâches de revue ({{ n_tasks }})</a> · <a href="/app/base/grille">Grille de sévérité</a>{% if n_rejected %} · <a href="/app/base/refusees">Demandes refusées ({{ n_rejected }})</a>{% endif %}</p>
 <p><input id="flt" class="filter" type="search" aria-label="Filtrer les ingrédients" placeholder="Filtrer les ingrédients…" oninput="for(const tr of document.querySelectorAll('#subs tr[data-n]'))tr.hidden=!tr.dataset.n.includes(this.value.toLowerCase())"></p></div>
 <div class="card flush scroll"><table id="subs"><tr><th>Ingrédient</th><th>Type</th><th>Origine</th><th>Allégations</th><th>Formulations</th><th>Motifs à risque</th><th>Avis donnés</th></tr>
 {% for s in rows %}<tr data-n="{{ s.name|lower }}"><td><a href="/app/base/{{ s.code }}">{{ s.name }}</a>{% if s.latin %}<div class="muted"><em>{{ s.latin }}</em></div>{% endif %}</td><td>{{ s.kind }}</td><td><span class="tag {{ 'ok' if s.origin == 'Import officiel' else 'info' }}">{{ s.origin }}</span></td><td>{{ s.claims }}</td><td>{{ s.variants }}</td><td>{{ s.risks }}</td><td>{{ s.reviewed }}</td></tr>{% endfor %}</table></div>{% endblock %}""",

@@ -20,6 +20,7 @@ from fastapi.responses import HTMLResponse
 from sqlalchemy import desc, insert, select, update
 
 from engine.textnorm import norm
+from engine import severity
 from webapp import kb_sync
 from webapp import main as m
 
@@ -52,6 +53,17 @@ m.T["rejected"] = """{% extends "base" %}{% block content %}<nav class="crumb" a
 <p class="muted">{{ n }} résultat(s){% if n > rows|length %}, {{ rows|length }} affichés{% endif %}.</p></div>
 <div class="card flush scroll"><table><tr><th>Ingrédient</th><th>Allégation demandée</th><th>Type</th><th>Référence</th></tr>
 {% for r in rows %}<tr><td>{{ r.substance_en }}</td><td>{{ r.claim_en }}</td><td>{{ r.type }}<div class="muted">{{ r.status }}</div></td><td class="muted">{{ r.id }}{% if r.efsa_question %}<div>{{ r.efsa_question }}</div>{% endif %}</td></tr>{% endfor %}</table></div>{% endblock %}"""
+
+
+m.T["grid"] = """{% import "macros" as mc %}{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
+<div class="page-head"><div><h1>Grille de sévérité</h1><div class="sub">Quel niveau pour quel constat, et pourquoi. Proposition de travail à valider : chaque règle peut être validée, corrigée ou rejetée.</div></div></div>
+<div class="kpis"><div class="kpi"><span class="tag red">À revoir en priorité</span><p class="small muted">Interdiction nette ou condition légale non remplie.</p></div>
+<div class="kpi"><span class="tag orange">À revoir</span><p class="small muted">Allégation probable, ou formulation à rapprocher du libellé officiel.</p></div>
+<div class="kpi"><span class="tag cond">À confirmer</span><p class="small muted">Le caractère d'allégation ou la condition dépend d'un élément à vérifier.</p></div></div>
+{% for r in rules %}<section class="card" id="{{ r.id }}"><div class="card-head"><h3>{{ r.id }} · {{ r.label }}</h3>
+{% if r.level in levels %}<span class="tag {{ levels[r.level][1] }}">{{ levels[r.level][0] }}</span>{% else %}<span class="tag info">{{ r.level_text }}</span>{% endif %}</div>
+<p>{{ r.when }}</p><p class="muted small">{{ r.why }}{% if r.legal %} · {% if r.legal_url %}<a href="{{ r.legal_url }}" target="_blank" rel="noopener">{{ r.legal }}</a>{% else %}{{ r.legal }}{% endif %}{% endif %}</p>
+{{ mc.review('grille', r.id, rv.get('grille:' ~ r.id), csrf, '/app/base/grille#' ~ r.id) }}</section>{% endfor %}{% endblock %}"""
 
 
 def latest_ok():
@@ -175,7 +187,23 @@ def health_base():
                                          "started_at": str(row["started_at"]), "finished_at": str(row["finished_at"])} if row else None})
 
 
+@m.app.get("/app/base/grille", response_class=HTMLResponse)
+def grid_page(request: Request):
+    user, stop = m.guard(request)
+    if stop:
+        return stop
+    from webapp.suggest import LEGAL_URLS
+    rules = []
+    for r in severity.GRID:
+        label = m.CODE_LABELS.get(r["code"]) or {"*IA*": "Certitude de l'IA", "*DOUBLON*": "Doublon lexique / IA",
+                                                 "*LEXIQUE*": "Termes du lexique"}.get(r["code"], r["code"])
+        rules.append({**r, "label": label, "legal": m.LEGAL_LABELS.get(r["basis"] or "", ""),
+                      "legal_url": LEGAL_URLS.get(r["basis"] or ""),
+                      "level_text": {"-1": "un niveau en dessous", "=": "compté une fois", "lexique": "selon le lexique"}.get(r["level"], r["level"])})
+    return m.render(request, "grid", title="Grille de sévérité", rules=rules, levels=m.LEVELS, rv=m.latest_reviews(user["id"]))
+
+
 # Ces pages doivent passer avant la route générique /app/base/{code} (fiche ingrédient).
-_paths = {"/app/base/sources", "/app/base/refusees"}
+_paths = {"/app/base/sources", "/app/base/refusees", "/app/base/grille"}
 _mine = [r for r in m.app.router.routes if getattr(r, "path", None) in _paths]
 m.app.router.routes[:] = _mine + [r for r in m.app.router.routes if r not in _mine]
