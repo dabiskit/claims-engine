@@ -112,7 +112,8 @@ def _auto_sync_loop() -> None:
     while True:
         try:
             row = latest_ok()
-            if (row is None or m.now() - m.aware(row["started_at"]) > timedelta(days=SYNC_DAYS)) and not is_running():
+            outdated = (m.SEED.get("official_import") or {}).get("format", 0) < 2   # nouveau format : réimport
+            if (row is None or outdated or m.now() - m.aware(row["started_at"]) > timedelta(days=SYNC_DAYS)) and not is_running():
                 start_sync()
         except Exception as exc:
             print(f"[kb] mise à jour automatique impossible : {exc}", flush=True)

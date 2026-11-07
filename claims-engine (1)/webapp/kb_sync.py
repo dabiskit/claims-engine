@@ -303,7 +303,7 @@ def build_dataset(annex_celex: str, annex_rows: list[dict], register: list[dict]
                 by_entry.setdefault(e, rec)
 
     substances: dict[str, dict] = {}
-    claims, conditions, variants = [], [], []
+    claims, conditions, variants, confirmations = [], [], [], []
     counters: dict[str, int] = {}
     for row in annex_rows:
         key = _base_name(row["substance_fr"])
@@ -317,6 +317,8 @@ def build_dataset(annex_celex: str, annex_rows: list[dict], register: list[dict]
                 "source_ref": ("VNR : Règl. (UE) 1169/2011, annexe XIII, partie A" if nrv else source_ref),
                 "confidence": "HAUTE", "aliases": _aliases(row["substance_fr"], key), "origin": "IMPORT_OFFICIEL"}
         if norm(row["claim_fr"]) in existing_claim_norms:
+            confirmations.append({"text_norm": norm(row["claim_fr"]), "source_ref": source_ref, "source_url": annex_url,
+                                  "efsa_ref": row["efsa_ref"], "conditions_fr": row["conditions_fr"]})
             continue
         counters[code] = counters.get(code, 0) + 1
         ccode = f"{code}-R432-{counters[code]:02d}"
@@ -336,7 +338,7 @@ def build_dataset(annex_celex: str, annex_rows: list[dict], register: list[dict]
     other_authorised = [r for r in register if r["status"] == "AUTORISEE" and r["type"] != "Art. 13.1"]
     rejected = [r for r in register if r["status"] in ("REFUSEE", "REVOQUEE")]
     return {
-        "format": 1, "retrieved_at": retrieved_at,
+        "format": 2, "retrieved_at": retrieved_at, "confirmations": confirmations,
         "sources": [
             {"name": "Règlement (UE) n° 432/2012 — version consolidée (FR)", "url": annex_url, "version": version,
              "items": len(annex_rows)},
@@ -363,6 +365,14 @@ def run_sync(existing_seed: dict) -> dict:
     return build_dataset(celex, rows, register, existing_seed, retrieved_at)
 
 
+_STOP = {"fonction", "fonctionnement", "normal", "normale", "normaux", "normales", "des", "les", "une", "pour", "dans", "aux"}
+
+
+def _sig(text: str) -> frozenset:
+    """Mots porteurs de sens : deux libellés d'une même allégation ne diffèrent que par des mots outils."""
+    return frozenset(w for w in re.findall(r"[a-z]+", norm(text)) if len(w) >= 3 and w not in _STOP)
+
+
 def merge_seed(base_seed: dict, dataset: dict | None) -> dict:
     """Seed effectif = base rédigée (prioritaire) + import officiel."""
     if not dataset:
@@ -370,14 +380,47 @@ def merge_seed(base_seed: dict, dataset: dict | None) -> dict:
     seed = {k: (list(v) if isinstance(v, list) else v) for k, v in base_seed.items()}
     known = {s["code"] for s in seed["substances"]}
     seed["substances"] += [s for s in dataset["substances"] if s["code"] not in known]
+    # Libellés de la base rédigée : le texte officiel fait foi.
+    #  * identique : la source officielle est rattachée ;
+    #  * quasi identique (même substance, écart de rédaction) : le libellé rédigé est corrigé, l'ancien est gardé
+    #    pour l'expert, et le doublon officiel n'est pas ajouté.
+    from difflib import SequenceMatcher
+    seed["regulatory_claims"] = [dict(c) for c in seed["regulatory_claims"]]
+    conf = {x["text_norm"]: x for x in dataset.get("confirmations", [])}
+    for c in seed["regulatory_claims"]:
+        x = conf.get(norm(c["text_fr"]))
+        if x:
+            c.update(source_url=x["source_url"], text_fr_source_ref=x["source_ref"], efsa_ref=x.get("efsa_ref"))
+    corrected: set[str] = set()
+    for nc in dataset["regulatory_claims"]:
+        target = norm(nc["text_fr"]).rstrip(". ")
+        best, score = None, 0.0
+        for c in seed["regulatory_claims"]:
+            if (c["substance"] != nc["substance"] or c.get("origin") == "IMPORT_OFFICIEL" or c["code"] in corrected
+                    or norm(c["text_fr"]) in conf or _sig(c["text_fr"]) != _sig(nc["text_fr"])):
+                continue
+            r = SequenceMatcher(None, norm(c["text_fr"]).rstrip(". "), target).ratio()
+            if r > score:
+                best, score = c, r
+        if best is not None and score >= 0.85:
+            corrected.add(best["code"])
+            best.update(text_fr_draft=best["text_fr"], text_fr=nc["text_fr"], text_fr_status="OFFICIEL_EUR_LEX_CORRIGE",
+                        text_fr_source_ref=nc["text_fr_source_ref"], source_url=nc["source_url"], efsa_ref=nc.get("efsa_ref"),
+                        register_id=nc.get("register_id"))
+            seed["claim_variants"].append({"code": f"{best['code']}-VOFF", "claim": best["code"], "text_fr": nc["text_fr"].rstrip(". "),
+                                           "syntactic_form": "PHRASE_COMPLETE", "is_official_wording": True,
+                                           "equivalence_note": "Libellé officiel (EUR-Lex), remplace la saisie"})
+            nc["_dup_of"] = best["code"]
     known_claims = {c["code"] for c in seed["regulatory_claims"]}
-    new_claims = [c for c in dataset["regulatory_claims"] if c["code"] not in known_claims]
+    new_claims = [c for c in dataset["regulatory_claims"] if c["code"] not in known_claims and not c.get("_dup_of")]
+    for c in dataset["regulatory_claims"]:
+        c.pop("_dup_of", None)
     seed["regulatory_claims"] += new_claims
     codes = {c["code"] for c in new_claims}
     seed["claim_conditions"] += [c for c in dataset["claim_conditions"] if c["claim"] in codes]
     seed["claim_variants"] += [v for v in dataset["claim_variants"] if v["claim"] in codes]
     seed["official_import"] = {"retrieved_at": dataset["retrieved_at"], "sources": dataset["sources"],
-                               "stats": dataset["stats"]}
+                               "stats": {**dataset["stats"], "corrected_drafts": len(corrected)}, "format": dataset.get("format", 1)}
     seed["rejected_claims"] = dataset.get("rejected", [])
     seed["other_authorised"] = dataset.get("other_authorised", [])
     rel = dict(seed["release"])

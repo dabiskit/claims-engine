@@ -44,7 +44,7 @@ TOPICS = {
     "psychisme": (["stress", "anxiete", "angoisse", "humeur", "moral", "nerveux", "nerveuse", "nerfs", "charge mentale", "zen"],
                   ["psychologiques", "systeme nerveux"]),
     "cognition": (["memoire", "concentration", "cerveau", "cognitif", "cognitive", "cognitives"], ["cognitive", "cerveau"]),
-    "sommeil": (["sommeil", "endormissement", "insomnie", "insomnies", "dormir", "nuits"], ["endormissement", "decalage horaire"]),
+    "sommeil": (["sommeil", "endormissement", "insomnie", "insomnies", "dormir"], ["endormissement", "decalage horaire"]),
     "cheveux": (["cheveux", "ongles", "chute de cheveux"], ["cheveux", "ongles"]),
     "vision": (["vision", "yeux", "oculaire", "vue"], ["vision"]),
     "muscles": (["muscle", "muscles", "musculaire", "crampe", "crampes", "recuperation"], ["musculaire", "muscles"]),
@@ -52,9 +52,9 @@ TOPICS = {
     "cholesterol": (["cholesterol", "cholesterolemie"], ["cholesterolemie"]),
     "glycemie": (["glycemie", "sucre sanguin", "diabete"], ["glycemie"]),
     "digestion": (["digestion", "digestif", "transit", "intestin", "intestinal", "ballonnements"], ["digestion", "intestinal", "transit"]),
-    "oxydation": (["oxydatif", "antioxydant", "antioxydants", "radicaux libres", "vieillissement", "anti-age", "anti age"],
+    "oxydation": (["oxydatif", "antioxydant", "antioxydants", "radicaux libres"],
                   ["stress oxydatif"]),
-    "vaisseaux": (["vaisseaux", "circulation", "jambes lourdes"], ["vaisseaux sanguins"]),
+    "vaisseaux": (["vaisseaux", "jambes lourdes", "veineux", "veineuse"], ["vaisseaux sanguins"]),
     "dents": (["dents", "gencives", "dentaire"], ["dents", "gencives"]),
     "thyroide": (["thyroide"], ["thyroidienne"]),
 }
@@ -102,6 +102,18 @@ def topics_of(text: str) -> list[str]:
     return [k for k, (words, _) in TOPICS.items() if any(_has(t, w) for w in words)]
 
 
+def sentence_of(quote: str, node_text: str) -> str:
+    """La phrase du passage qui contient la citation (et non tout le paragraphe)."""
+    if not node_text:
+        return quote or ""
+    i = node_text.find(quote) if quote else -1
+    if i < 0:
+        return quote or node_text[:300]
+    start = max(node_text.rfind(".", 0, i), node_text.rfind("!", 0, i), node_text.rfind("?", 0, i)) + 1
+    ends = [j for j in (node_text.find(c, i + len(quote)) for c in ".!?") if j != -1]
+    return node_text[start:(min(ends) + 1) if ends else len(node_text)].strip()
+
+
 class Suggester:
     """claims : code -> allégation (base effective) ; usable : code allégation -> (libellé statut, classe css)
     pour les substances de la composition ; substances : code -> fiche ; bridges : ponts sémantiques ;
@@ -111,36 +123,38 @@ class Suggester:
         self.claims, self.usable, self.substances, self.lexicon = claims, usable, substances, lexicon
         self.bridges = [(norm(t), b) for b in bridges for t in b.get("illegal_query_terms", [])]
         self.by_topic: dict[str, list[str]] = {}
+        seen_text: set[str] = set()
         for code, c in claims.items():
-            if c.get("regime") == "REJECTED_EU_REGISTER":
+            ct = norm(c["text_fr"]).rstrip(". ")
+            if c.get("regime") == "REJECTED_EU_REGISTER" or ct in seen_text:
                 continue
-            ct = norm(c["text_fr"])
+            seen_text.add(ct)
             for k, (_, claim_words) in TOPICS.items():
                 if any(w in ct for w in claim_words):
                     self.by_topic.setdefault(k, []).append(code)
 
-    def _claim_view(self, code: str) -> dict:
+    def _claim_view(self, code: str, why: str = "") -> dict:
         c = self.claims[code]
         status = self.usable.get(code)
         return {"code": code, "text": c["text_fr"], "substance": self.substances.get(c["substance"], {}).get("name_fr", ""),
                 "status": status[0] if status else None, "css": status[1] if status else "info",
-                "source": c.get("text_fr_source_ref"), "source_url": c.get("source_url")}
+                "source": c.get("text_fr_source_ref"), "source_url": c.get("source_url"), "why": why}
 
-    def claims_for(self, text: str, limit: int = 3) -> tuple[list[dict], list[str]]:
+    def claims_for(self, text: str, limit: int = 2) -> tuple[list[dict], list[str]]:
+        """Allégations autorisées du thème du texte : d'abord celles de la composition (utilisables en tête),
+        sinon le nom des ingrédients qui en disposent."""
         topics = topics_of(text)
         mine, others = [], []
         rank = {"ok": 0, "cond": 1, "red": 2}
         for t in topics:
             for code in self.by_topic.get(t, []):
-                if code in self.usable:
-                    mine.append(code)
-                else:
-                    others.append(self.claims[code]["substance"])
+                (mine if code in self.usable else others).append(code)
         mine = sorted(dict.fromkeys(mine), key=lambda c: rank.get(self.usable[c][1], 3))[:limit]
-        names = list(dict.fromkeys(self.substances.get(s, {}).get("name_fr", s) for s in others))[:6]
-        return [self._claim_view(c) for c in mine], names
+        names = list(dict.fromkeys(self.substances.get(self.claims[c]["substance"], {}).get("name_fr", "") for c in others))
+        return [self._claim_view(c) for c in mine], [n for n in names if n][:6]
 
-    def suggest(self, code: str, lexical_code: str | None, quote: str, node_text: str) -> dict | None:
+    def suggest(self, code: str, lexical_code: str | None, quote: str, node_text: str,
+                claim_code: str | None = None) -> dict | None:
         q = norm(quote or "")
         entry = self.lexicon.get(lexical_code or code) or {}
         fix = TERM_FIXES.get(q)
@@ -150,13 +164,42 @@ class Suggester:
         bridge = next((b for t, b in self.bridges if t and (t == q or t in q)), None)
         if bridge and not replace_with:
             replace_with = bridge.get("legal_term")
-        context = node_text or quote or ""
-        claims, others = self.claims_for(context)
-        if bridge:
-            for cc in bridge.get("anchor_claims", []):
-                if cc in self.claims and all(c["code"] != cc for c in claims):
-                    claims.insert(0, self._claim_view(cc))
+        claims: list[dict] = []
+        if claim_code and claim_code in self.claims:
+            # L'IA a rapproché la phrase d'une allégation autorisée précise : c'est son libellé officiel qu'il faut reprendre.
+            claims.append(self._claim_view(claim_code, "libellé officiel à reprendre tel quel"))
+        for cc in (bridge or {}).get("anchor_claims", []):
+            if cc in self.claims and all(c["code"] != cc for c in claims):
+                claims.append(self._claim_view(cc))
+        others: list[str] = []
+        if not claims:
+            # thème de la citation d'abord ; un mot isolé (« prévenir ») prend le thème de sa phrase
+            basis = quote if topics_of(quote or "") or len(q.split()) > 3 else sentence_of(quote, node_text)
+            claims, others = self.claims_for(basis)
         if not (replace_with or advice or claims or others):
             return None
-        return {"replace_with": replace_with, "advice": advice, "claims": claims[:3],
-                "others": [] if claims else others}
+        return {"replace_with": replace_with, "advice": advice, "claims": claims[:2], "others": [] if claims else others}
+
+
+def dedupe_in_passage(findings: list[dict]) -> None:
+    """Dans un même passage, une allégation ou un conseil n'est proposé qu'une fois (au premier constat)."""
+    seen_claims: set[str] = set()
+    seen_advice: set[str] = set()
+    seen_others: set[str] = set()
+    for f in findings:
+        s = f.get("suggestion")
+        if not s:
+            continue
+        s["claims"] = [c for c in s["claims"] if c["code"] not in seen_claims]
+        seen_claims.update(c["code"] for c in s["claims"])
+        if s.get("advice") in seen_advice:
+            s["advice"] = None
+        elif s.get("advice"):
+            seen_advice.add(s["advice"])
+        key = ",".join(s.get("others") or [])
+        if key and key in seen_others:
+            s["others"] = []
+        elif key:
+            seen_others.add(key)
+        if not (s.get("replace_with") or s.get("advice") or s["claims"] or s.get("others")):
+            f["suggestion"] = None

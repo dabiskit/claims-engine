@@ -57,7 +57,7 @@ from engine.mode_router import lexical_hits  # noqa: E402
 from engine.page_scope import detect_composition, isolate  # noqa: E402
 from engine.textnorm import norm  # noqa: E402
 from webapp import kb_sync  # noqa: E402
-from webapp.suggest import LEGAL_URLS, REGISTER_URL, Suggester  # noqa: E402
+from webapp.suggest import LEGAL_URLS, REGISTER_URL, Suggester, dedupe_in_passage, sentence_of  # noqa: E402
 from eval.pipeline_adapter import KnowledgeBase, ReplayPipeline, product_of  # noqa: E402
 
 APP_NAME = os.environ.get("APP_NAME", "Pré-analyse des allégations")
@@ -464,7 +464,8 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
                 "legal_url": LEGAL_URLS.get(f.legal_basis or ""),
                 "substance": SUBSTANCES.get(f.substance or "", {}).get("name_fr"),
                 "remediations": [REMEDIATIONS.get(r, r) for r in dict.fromkeys(f.remediation_codes)],
-                "_lex": f.lexical_code, "_node": f.node_text}
+                "rationale": getattr(f, "rationale", None) if f.code.startswith("IA_") else None,
+                "_lex": f.lexical_code, "_node": f.node_text, "_claim": getattr(f, "claim_code", None)}
         if f.code in ("REFERENCE_GENERALE_ART10_3", "IA_REFERENCE_GENERALE") and f.node_key:
             term = norm(f.quote or "")
             g = general_refs.setdefault(term, {"term": f.quote, "count": 0, "examples": [], "explanation": item["explanation"],
@@ -518,11 +519,22 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
     # Propositions de remplacement (base uniquement) : libellé de substitution, allégations autorisées du même thème.
     status_by_claim = {c["code"]: c["status"] for u in usable for c in u["claims"]}
     sugg = Suggester(KB.claims, status_by_claim, SUBSTANCES, KB.bridges, LEXICON)
+    unauthorised = {"IA_ALLEGATION_SANS_CORRESPONDANCE", "ALLEGATION_NON_AUTORISEE", "IA_REDUCTION_RISQUE_NON_AUTORISEE",
+                    "IA_PROPRIETE_THERAPEUTIQUE"}
     for n in nodes.values():
         for it in n["findings"]:
-            it["suggestion"] = sugg.suggest(it["code"], it.pop("_lex", None), it["quote"], it.pop("_node", ""))
+            node_text = it.pop("_node", "")
+            it["suggestion"] = sugg.suggest(it["code"], it.pop("_lex", None), it["quote"], node_text, it.pop("_claim", None))
+            # Preuve propre au constat : les demandes refusées par la Commission pour l'ingrédient cité dans la phrase.
+            if it["code"] in unauthorised:
+                hit = next(iter(kb_sync.rejected_for(SEED, norm(sentence_of(it["quote"], node_text) + " " + product_name))), None)
+                if hit:
+                    key = kb_sync.REJECTED_SUBJECTS.get(hit["name"], [hit["name"]])[0]
+                    it["evidence"] = {"label": f"{hit['count']} demande(s) refusée(s) pour « {hit['name']} » au registre de l'Union",
+                                      "url": f"/app/base/refusees?q={key}"}
+        dedupe_in_passage(n["findings"])
     for it in page_level:
-        it.pop("_lex", None), it.pop("_node", None)
+        it.pop("_lex", None), it.pop("_node", None), it.pop("_claim", None)
     for g in general_refs.values():
         g["claims"], g["others"] = sugg.claims_for(g["term"] or "", limit=2)
 
@@ -939,7 +951,7 @@ T = {
 {% macro sug(x) %}{% if x %}<div class="suggest"><div class="suggest-title">Proposition de remplacement</div>
 {% if x.replace_with %}<p>Remplacer par : <strong>« {{ x.replace_with }} »</strong></p>{% endif %}
 {% if x.advice %}<p class="muted small">{{ x.advice }}</p>{% endif %}
-{% if x.claims %}<p class="small">Allégation{{ 's' if x.claims|length > 1 }} autorisée{{ 's' if x.claims|length > 1 }} sur ce thème :</p><ul class="list-plain small">{% for c in x.claims %}<li>{% if c.status %}<span class="tag {{ c.css }}">{{ c.status }}</span> {% endif %}« {{ c.text }} »{% if c.source_url %} <a class="faint" href="{{ c.source_url }}" target="_blank" rel="noopener">source</a>{% endif %}{% if not c.status %} <span class="faint">({{ c.substance }} : absent de la composition)</span>{% endif %}</li>{% endfor %}</ul>
+{% if x.claims %}<p class="small">{{ 'Libellé officiel à reprendre' if x.claims[0].why else ('Allégation' ~ ('s' if x.claims|length > 1 else '') ~ ' autorisée' ~ ('s' if x.claims|length > 1 else '') ~ ' sur ce thème, pour cette composition') }} :</p><ul class="list-plain small">{% for c in x.claims %}<li>{% if c.status %}<span class="tag {{ c.css }}">{{ c.status }}</span> {% endif %}« {{ c.text }} »{% if c.source_url %} <a class="faint" href="{{ c.source_url }}" target="_blank" rel="noopener">source</a>{% endif %}{% if not c.status %} <span class="faint">({{ c.substance }} : absent de la composition)</span>{% endif %}</li>{% endfor %}</ul>
 {% elif x.others %}<p class="small muted">Aucun ingrédient de la composition n'a d'allégation autorisée sur ce thème. Ingrédients qui en ont une : {{ x.others|join(', ') }}.</p>{% endif %}</div>{% endif %}{% endmacro %}
 
 <nav class="crumb" aria-label="Fil d'Ariane"><a href="/app">← Nouvelle analyse</a>{% if r.audit_id %}<a href="/app/audits/{{ r.audit_id }}">← Retour à l'audit</a>{% endif %}</nav>
@@ -983,7 +995,8 @@ T = {
 {% set others = r.nodes|rejectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else [] %}
 {% macro node_card(n) %}<article class="card"><p class="passage {{ 'red' if n.has_red }}">{{ n.html|safe }}</p>
 {% for f in n.findings %}<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{% if f.ai %}<span class="tag info">IA</span> {% endif %}<span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}
-{% if f.legal %}<div class="meta">{{ legal(f, 'Fondement : ') }}</div>{% endif %}
+{% if f.rationale %}<div class="meta">Analyse IA : {{ f.rationale }}</div>{% endif %}
+{% if f.legal %}<div class="meta">{{ legal(f, 'Fondement : ') }}{% if f.evidence %} · <a href="{{ f.evidence.url }}">{{ f.evidence.label }}</a>{% endif %}</div>{% endif %}
 {% if f.suggestion %}{{ sug(f.suggestion) }}{% elif f.remediations %}<div class="meta">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div></div>{% endfor %}</article>{% endmacro %}
 {% if reds %}<div class="section-title"><h2>Passages à revoir en priorité ({{ reds|length }})</h2></div>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
 {% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary><div class="stack">{% for n in others %}{{ node_card(n) }}{% endfor %}</div></details>{% endif %}
