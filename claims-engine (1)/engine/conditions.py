@@ -197,6 +197,9 @@ def evaluate_claim(claim_code: str, substance_code: str, conditions: Iterable[Co
         elif c.type == "AUCUNE_CONDITION_CHIFFREE":
             results.append(ConditionResult(c, CondStatus.A_DOCUMENTER,
                                            "La source ne fixe aucune condition chiffrée : niveau de preuve à documenter"))
+        elif c.type == "CONDITION_TEXTE":
+            # Condition officielle importée telle quelle (non chiffrable automatiquement) : à confirmer.
+            results.append(ConditionResult(c, CondStatus.INCONNUE, "À vérifier : " + str(c.params.get("text_fr", ""))[:400]))
         else:
             results.append(ConditionResult(c, CondStatus.INCONNUE, f"Type de condition non géré : {c.type}"))
     statuses = {r.status for r in results}
