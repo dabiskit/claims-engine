@@ -50,6 +50,8 @@ class Finding:
     substance: str | None = None
     lexical_code: str | None = None
     remediation_codes: tuple[str, ...] = ()
+    claim_code: str | None = None         # allégation autorisée rapprochée par l'IA (liste fermée)
+    rationale: str | None = None          # justification courte de l'IA, affichée à titre indicatif
 
 
 @dataclass
@@ -476,7 +478,9 @@ class LivePipeline(ReplayPipeline):
         ctype, sub, code = it["claim_type"], it.get("substance_code"), it["matched_claim_code"]
 
         def mk(fcode, level, basis, rem=()):
-            return Finding(fcode, level, key, text, quote, basis, sub, remediation_codes=tuple(rem))
+            return Finding(fcode, level, key, text, quote, basis, sub, remediation_codes=tuple(rem),
+                           claim_code=code if code and code != "AUCUNE" else None,
+                           rationale=(it.get("rationale") or "")[:400] or None)
 
         if ctype == "PROPRIETE_THERAPEUTIQUE_INTERDITE":
             return mk("IA_PROPRIETE_THERAPEUTIQUE", "ROUGE", "INCO_1169_2011_ART7_3", ("REECRIRE_ALLEGATION",))
