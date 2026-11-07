@@ -21,6 +21,7 @@ from typing import Protocol
 from engine.conditions import ClaimUsability, Condition, Ingredient, Product, evaluate_claim
 from engine.dom_extractor import NOT_ANALYZED_ZONES, extract_page, fragment_nodes, patch_fragment, plain_from_marked
 from engine.frozen_zones import FrozenKind, scan_frozen
+from engine.severity import level_for
 from engine.lexicon import LexiconIndex
 from engine.mode_router import Catalog, Mode, ModeDecision, lexical_hits, route_page
 from engine.rewrite_assembler import UnsupportedSegment, assemble_and_validate, build_reference_text
@@ -52,6 +53,8 @@ class Finding:
     remediation_codes: tuple[str, ...] = ()
     claim_code: str | None = None         # allégation autorisée rapprochée par l'IA (liste fermée)
     rationale: str | None = None          # justification courte de l'IA, affichée à titre indicatif
+    certainty: str | None = None          # HAUTE | MOYENNE | BASSE (IA)
+    replacement: dict | None = None       # remplacement proposé par l'IA, après contrôle par les règles
 
 
 @dataclass
@@ -473,15 +476,55 @@ class LivePipeline(ReplayPipeline):
         base.latency_s += time.perf_counter() - t0
         return base
 
+    def _replacement(self, it, product, in_kb) -> dict | None:
+        """Contrôle du remplacement proposé par l'IA. Accepté seulement si : l'allégation est dans la liste
+        fermée, porte sur un ingrédient de la composition et n'est pas inutilisable ; le texte reprend son libellé
+        officiel à l'identique ; aucun terme à risque du lexique n'y figure. Sinon : rejeté, avec la raison."""
+        action = it.get("replacement_action") or "AUCUNE"
+        if action == "AUCUNE":
+            return None
+        out = {"action": action, "claim_code": None, "text": (it.get("replacement_text") or "").strip()[:400],
+               "status": "VALIDEE", "reason": None}
+        ccode = it.get("replacement_claim_code")
+        if action == "SUPPRIMER":
+            out["text"] = ""
+            return out
+        if action == "REMPLACER_PAR_ALLEGATION":
+            claim = self.kb.claims.get(ccode or "")
+            if claim is None or claim["substance"] not in in_kb:
+                return {**out, "status": "REJETEE", "reason": "allégation hors de la composition"}
+            ev = evaluate_claim(ccode, claim["substance"], self.kb.conditions.get(ccode, []), product)
+            if ev.usability is ClaimUsability.INUTILISABLE:
+                return {**out, "status": "REJETEE", "reason": "condition de l'allégation non remplie"}
+            out["claim_code"], out["usability"] = ccode, ev.usability.value
+            official = norm(claim["text_fr"]).rstrip(". ")
+            if out["text"] and official not in norm(out["text"]):
+                out["text"], out["reason"] = claim["text_fr"].rstrip(". ") + ".", "texte IA modifiant le libellé : libellé officiel repris"
+            elif not out["text"]:
+                out["text"] = claim["text_fr"].rstrip(". ") + "."
+        if not out["text"]:
+            return {**out, "status": "REJETEE", "reason": "aucun texte proposé"}
+        risky = [h for h in lexical_hits(self.kb.lexicon, out["text"])
+                 if h.entry.severity.get("PRODUIT") in ("ROUGE", "ORANGE")]
+        if risky:
+            return {**out, "status": "REJETEE", "reason": "terme à risque dans la proposition : "
+                    + ", ".join(sorted({out["text"][h.start:h.end] for h in risky}))}
+        return out
+
     def _verdict(self, it, quote, key, text, start, end, product, in_kb, has_specific, page_norm, base):
         kb = self.kb
         ctype, sub, code = it["claim_type"], it.get("substance_code"), it["matched_claim_code"]
 
-        def mk(fcode, level, basis, rem=()):
-            return Finding(fcode, level, key, text, quote, basis, sub, remediation_codes=tuple(rem),
-                           claim_code=code if code and code != "AUCUNE" else None,
-                           rationale=(it.get("rationale") or "")[:400] or None)
+        certainty = it.get("certainty")
 
+        def mk(fcode, level, basis, rem=()):
+            return Finding(fcode, level_for(fcode, level, certainty), key, text, quote, basis, sub,
+                           remediation_codes=tuple(rem), claim_code=code if code and code != "AUCUNE" else None,
+                           rationale=(it.get("rationale") or "")[:400] or None, certainty=certainty,
+                           replacement=self._replacement(it, product, in_kb))
+
+        if ctype == "PROPRIETE_TECHNOLOGIQUE":
+            return mk("IA_PROPRIETE_TECHNOLOGIQUE", "CONDITIONNEL", "R1924_2006_ART10_1", ("REECRIRE_ALLEGATION",))
         if ctype == "PROPRIETE_THERAPEUTIQUE_INTERDITE":
             return mk("IA_PROPRIETE_THERAPEUTIQUE", "ROUGE", "INCO_1169_2011_ART7_3", ("REECRIRE_ALLEGATION",))
         if ctype == "NUTRITIONNELLE":
