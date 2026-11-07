@@ -70,6 +70,13 @@ STATIC_PATTERNS: list[tuple[FrozenKind | None, str]] = [
      r"\s+(?:des\s+)?substituts?\s+d['’]un\s+r[ée]gime\s+alimentaire\s+vari[ée](?:\s+et\s+[ée]quilibr[ée])?"
      r"(?:\s+et\s+d['’]un\s+mode\s+de\s+vie\s+sain)?"),
     (FrozenKind.AVERTISSEMENT_OBLIGATOIRE, r"d[ée]conseill[ée]e?s?\s+(?:aux|chez\s+les)\s+[^.!?⟦⟧]{3,200}"),
+    # Avertissement négatif usuel : « n'est pas destiné à diagnostiquer, traiter, soigner ou prévenir une maladie »
+    (FrozenKind.AVERTISSEMENT_OBLIGATOIRE,
+     r"(?:n['’]\s*(?:est|sont)|ne\s+(?:sont|doit|doivent|peut|peuvent))\s+pas\s+(?:destin[ée]e?s?|con[çc]ue?s?|pr[ée]vue?s?)\s+"
+     r"(?:[àa]|pour)\s+(?:diagnostiquer|traiter|soigner|gu[ée]rir|pr[ée]venir)[^.!?⟦⟧]{0,200}"),
+    (FrozenKind.AVERTISSEMENT_OBLIGATOIRE,
+     r"ne\s+(?:remplace|remplacent|se\s+substitue|se\s+substituent)\s+pas\s+(?:[àa]\s+)?(?:un|une|le|les|aux?)\s+"
+     r"(?:traitements?|avis|consultations?|m[ée]dicaments?)\s+m[ée]dica(?:l|ux|le|les)?[^.!?⟦⟧]{0,120}"),
     (FrozenKind.AVERTISSEMENT_OBLIGATOIRE,
      r"(?:demander|demandez|prendre|prenez)\s+(?:l['’])?avis\s+(?:d['’]un|de\s+votre|[àa]\s+votre|[àa]\s+un)\s+"
      r"(?:m[ée]decin|pharmacien|professionnel\s+de\s+sant[ée])[^.!?⟦⟧]{0,200}"),

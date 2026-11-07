@@ -286,7 +286,13 @@ def detect_composition(texts: list[str], aliases: dict[str, list[str]], labels: 
                     if gap < 0:
                         continue
                     between = t[q.end():s] if q.end() <= s else t[e:q.start()]
-                    if re.search(r"[.;!?]", between):
+                    if q.end() <= s:
+                        # « 60 mg de vitamine C » : seule une préposition sépare la dose de la substance.
+                        # « 6 g, arôme framboise, acide ascorbique » : la dose est celle de la portion, pas de la substance.
+                        if not re.fullmatch(r"\s*(?:de |d'|d )?\s*(?:la |l')?\s*", between):
+                            continue
+                    elif re.search(r"[.;!?,]", between) or len(between) > 30:
+                        # « vitamine C : 60 mg », « vitamine C (60 mg) », ligne de tableau « Vitamine C 60 mg 75 % »
                         continue
                     if any(a2 != a and a2 in between for a2, _ in alias_list[:400] if len(a2) >= 5):
                         continue                  # une autre substance s'intercale : ce n'est pas sa dose

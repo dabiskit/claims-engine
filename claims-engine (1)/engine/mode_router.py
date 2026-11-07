@@ -56,7 +56,7 @@ PAGE_LEVEL_MEDICINAL_THRESHOLD = {"ROUGE": 4, "ORANGE": 2}   # à calibrer sur l
 # Dans un avertissement obligatoire (« Déconseillé aux… », « Demander l'avis d'un médecin en cas de… »),
 # citer une pathologie ou un traitement est attendu : ces catégories y sont tolérées. Les verbes
 # thérapeutiques (soigne, guérit…) restent détectés partout.
-WARNING_TOLERATED_CATEGORIES = frozenset({"PATHOLOGIE", "TERME_MEDICAL", "VOCABULAIRE_PHARMACEUTIQUE"})
+WARNING_TOLERATED_CATEGORIES = frozenset({"PATHOLOGIE", "TERME_MEDICAL", "VOCABULAIRE_PHARMACEUTIQUE", "VERBE_THERAPEUTIQUE"})
 WARNING_TOLERATED_CODES = frozenset({"LEX-TRAITER"})
 
 
