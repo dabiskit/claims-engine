@@ -185,6 +185,9 @@ def database_url() -> str:
     if not url:
         DB_STATUS.update(config="vide", detail="variable DATABASE_URL définie mais vide")
         return SQLITE_URL
+    if url.startswith("sqlite"):
+        DB_STATUS.update(config="sqlite", detail="base SQLite explicitement configurée")
+        return url
     m_ = re.match(r"^(postgres(?:ql)?(?:\+psycopg)?)://([^:/@]+):(.*)@([^@/]+)(/.*)?$", url)
     if not m_:
         DB_STATUS.update(config="invalide", detail="DATABASE_URL ne commence pas par postgresql://utilisateur:motdepasse@hôte")
@@ -202,7 +205,7 @@ def database_url() -> str:
 
 def _make_engine():
     url = database_url()
-    if url == SQLITE_URL:
+    if url.startswith("sqlite"):
         return create_engine(url, pool_pre_ping=True)
     eng = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 10})
     try:
@@ -596,38 +599,252 @@ EXAMPLES = examples()
 # Gabarits
 # -----------------------------------------------------------------------------
 CSS = """
-:root{--bg:#fafaf8;--card:#fff;--fg:#1d1d1b;--muted:#66655f;--line:#e4e2dc;--accent:#1f5f8b;--red:#b42318;--redbg:#fde8e6;
---orange:#b54708;--orangebg:#fef0e1;--cond:#6941c6;--condbg:#f1ecfd;--ok:#067647;--okbg:#e6f6ee;--infobg:#eef2f6}
-@media (prefers-color-scheme: dark){:root{--bg:#141413;--card:#1c1c1a;--fg:#ecebe6;--muted:#a3a29c;--line:#2f2e2b;--accent:#7cb4dc;
---red:#ff8a80;--redbg:#3b1714;--orange:#ffb870;--orangebg:#3a2410;--cond:#c3b1ff;--condbg:#251c3d;--ok:#6fd3a0;--okbg:#0f2e20;--infobg:#1d2630}}
-*{box-sizing:border-box}body{margin:0;font:16px/1.55 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--fg)}
-a{color:var(--accent)}header{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;padding:12px 24px;border-bottom:1px solid var(--line);background:var(--card)}
-header .brand{font-weight:700;text-decoration:none;color:var(--fg)}nav{display:flex;gap:16px;align-items:center;flex-wrap:wrap}nav form{margin:0}
-main{max-width:1100px;margin:0 auto;padding:24px}.banner{background:var(--orangebg);color:var(--fg);padding:8px 24px;font-size:14px}
-.trial{background:var(--okbg);padding:6px 24px;font-size:14px}.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:18px;margin:0 0 16px}
-.btn,button{display:inline-block;background:var(--accent);color:#fff;border:0;border-radius:8px;padding:9px 16px;font:inherit;cursor:pointer;text-decoration:none}
-button.link{background:none;color:var(--accent);padding:0}input,select,textarea{font:inherit;padding:8px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--fg);max-width:100%}
-textarea{width:100%;min-height:200px;font-family:ui-monospace,Menlo,monospace;font-size:13px}label{display:block;margin:10px 0 4px;font-weight:600}
-table{border-collapse:collapse;width:100%}th,td{text-align:left;vertical-align:top;padding:8px;border-bottom:1px solid var(--line)}.scroll{overflow-x:auto}
-.tag{display:inline-block;border-radius:999px;padding:1px 10px;font-size:13px;font-weight:600}.red{background:var(--redbg);color:var(--red)}
-.orange{background:var(--orangebg);color:var(--orange)}.cond{background:var(--condbg);color:var(--cond)}.ok{background:var(--okbg);color:var(--ok)}.info{background:var(--infobg)}
-mark.red{background:var(--redbg);color:var(--red);font-weight:600}mark.orange{background:var(--orangebg);color:var(--orange)}mark.cond{background:var(--condbg)}mark.info{background:var(--infobg)}
-.muted{color:var(--muted)}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}.row{display:flex;gap:8px;flex-wrap:wrap;align-items:end}
-form.review{display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-top:6px}form.review input[name=comment]{flex:1;min-width:180px}
-.error{background:var(--redbg);color:var(--red);padding:10px;border-radius:8px}.count{font-size:28px;font-weight:700}
+/* ---- Design system : variables (clair) ---- */
+:root{color-scheme:light;
+--bg:#f6f6f4;--surface:#ffffff;--surface-2:#f1f0ec;--surface-3:#e9e7e2;
+--border:#e2e0da;--border-strong:#cfccc4;--text:#1b1a18;--text-2:#55534e;--text-3:#7a776f;
+--accent:#2d5a78;--accent-hover:#244a63;--accent-soft:#e6eef4;--accent-text:#ffffff;--focus:#4f86ab;
+--red:#9b2c1f;--red-bg:#f9ebe8;--red-line:#efcdc6;
+--orange:#8a5000;--orange-bg:#faf0e1;--orange-line:#edd7b3;
+--cond:#5a4a96;--cond-bg:#efecf8;--cond-line:#d9d2ef;
+--ok:#2c6a44;--ok-bg:#e6f2ea;--ok-line:#c7e0d0;
+--info:#4a5562;--info-bg:#eef1f4;--info-line:#d8dee5;
+--shadow:0 1px 2px rgb(20 20 18 / .04);
+--s1:4px;--s2:8px;--s3:12px;--s4:16px;--s5:20px;--s6:24px;--s8:32px;--s10:40px;--s12:48px;
+--r1:4px;--r2:6px;--r3:8px;--r4:12px;
+--f-xs:12px;--f-sm:13px;--f-md:14px;--f-base:15px;--f-lg:17px;--f-xl:20px;--f-2xl:24px;--f-3xl:30px;
+/* alias de compatibilité (gabarits existants) */
+--card:var(--surface);--fg:var(--text);--muted:var(--text-2);--line:var(--border);
+--redbg:var(--red-bg);--orangebg:var(--orange-bg);--condbg:var(--cond-bg);--okbg:var(--ok-bg);--infobg:var(--info-bg)}
+@media (prefers-color-scheme: dark){:root{color-scheme:dark;
+--bg:#121211;--surface:#1a1a18;--surface-2:#21211e;--surface-3:#2a2a26;
+--border:#2f2e2a;--border-strong:#403e39;--text:#edece8;--text-2:#aeaba3;--text-3:#8b8880;
+--accent:#86aecb;--accent-hover:#a2c3db;--accent-soft:#1d2a33;--accent-text:#0f1a21;--focus:#9cc1dc;
+--red:#f0a79b;--red-bg:#33201c;--red-line:#53302a;
+--orange:#e9bd7d;--orange-bg:#30251a;--orange-line:#4d3a24;
+--cond:#c3b6f0;--cond-bg:#26213a;--cond-line:#3a3358;
+--ok:#94d1ab;--ok-bg:#1b2b21;--ok-line:#2b4433;
+--info:#b6c0cb;--info-bg:#20252b;--info-line:#323a43;
+--shadow:0 1px 2px rgb(0 0 0 / .3)}}
+
+/* ---- Base ---- */
+*,*::before,*::after{box-sizing:border-box}
+html{-webkit-text-size-adjust:100%}
+body{margin:0;background:var(--bg);color:var(--text);font:400 var(--f-base)/1.55 "Inter",ui-sans-serif,system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+-webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility}
+h1,h2,h3{margin:0 0 var(--s3);line-height:1.25;letter-spacing:-.01em;color:var(--text)}
+h1{font-size:var(--f-2xl);font-weight:650}h2{font-size:var(--f-lg);font-weight:620}h3{font-size:var(--f-base);font-weight:620}
+p{margin:0 0 var(--s3)}p:last-child{margin-bottom:0}
+ul,ol{margin:0 0 var(--s3);padding-left:var(--s5)}li{margin:var(--s1) 0}
+a{color:var(--accent);text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--accent) 35%,transparent);text-underline-offset:3px}
+a:hover{color:var(--accent-hover);text-decoration-color:currentColor}
+strong{font-weight:620}em{font-style:italic}
+hr{border:0;border-top:1px solid var(--border);margin:var(--s4) 0}
+img{max-width:100%}
+:focus-visible{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r1)}
+::selection{background:var(--accent-soft)}
+@media (prefers-reduced-motion: reduce){*{transition:none!important;animation:none!important}}
+.skip{position:absolute;left:var(--s2);top:-100px;background:var(--surface);padding:var(--s2) var(--s3);border:1px solid var(--border);border-radius:var(--r2);z-index:10}
+.skip:focus{top:var(--s2)}
+
+/* ---- Barre supérieure ---- */
+header{position:sticky;top:0;z-index:5;display:flex;justify-content:space-between;align-items:center;gap:var(--s4);flex-wrap:wrap;
+padding:0 var(--s6);min-height:56px;background:color-mix(in srgb,var(--surface) 92%,transparent);backdrop-filter:saturate(1.4) blur(8px);border-bottom:1px solid var(--border)}
+header .brand{display:inline-flex;align-items:center;gap:var(--s2);font-weight:650;font-size:var(--f-base);color:var(--text);text-decoration:none;letter-spacing:-.01em}
+header .brand .mark{width:20px;height:20px;border-radius:var(--r1);background:var(--accent);display:inline-grid;place-items:center;color:var(--accent-text);font-size:11px;font-weight:700}
+nav{display:flex;gap:var(--s1);align-items:center;flex-wrap:wrap}
+nav a{color:var(--text-2);text-decoration:none;font-size:var(--f-md);font-weight:500;padding:var(--s1) var(--s3);border-radius:var(--r2);line-height:28px}
+nav a:hover{color:var(--text);background:var(--surface-2)}
+nav a[aria-current="page"]{color:var(--text);background:var(--surface-3)}
+nav .sep{width:1px;height:20px;background:var(--border);margin:0 var(--s2)}
+nav form{margin:0}nav .btn{line-height:20px;color:var(--accent-text)}nav .btn:hover{color:var(--accent-text);background:var(--accent-hover)}
+.banner{background:var(--surface-2);color:var(--text-2);padding:var(--s2) var(--s6);font-size:var(--f-xs);border-bottom:1px solid var(--border)}
+.trial{background:var(--accent-soft);color:var(--text);padding:var(--s2) var(--s6);font-size:var(--f-sm);border-bottom:1px solid var(--border)}
+
+/* ---- Mise en page ---- */
+main{max-width:1120px;margin:0 auto;padding:var(--s8) var(--s6) var(--s12)}
+.page-head{display:flex;justify-content:space-between;align-items:flex-end;gap:var(--s4);flex-wrap:wrap;margin-bottom:var(--s6)}
+.page-head h1{margin:0}.page-head .sub{color:var(--text-2);font-size:var(--f-md);margin-top:var(--s1)}
+.eyebrow{font-size:var(--f-xs);font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--text-3);margin-bottom:var(--s2)}
+.crumb{display:inline-flex;gap:var(--s2);font-size:var(--f-sm);margin-bottom:var(--s4)}
+.crumb a{color:var(--text-2);text-decoration:none}.crumb a:hover{color:var(--text)}
+.layout{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:var(--s6);align-items:start}
+@media (max-width:900px){.layout{grid-template-columns:1fr}}
+.stack>*+*{margin-top:var(--s4)}
+.section-title{display:flex;align-items:baseline;justify-content:space-between;gap:var(--s3);margin:var(--s8) 0 var(--s3)}
+.section-title h2{margin:0}.section-title .muted{font-size:var(--f-sm)}
+
+/* ---- Surfaces ---- */
+.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--r3);padding:var(--s5) var(--s6);margin:0 0 var(--s4);box-shadow:var(--shadow)}
+.card>h2:first-child,.card>h3:first-child{margin-top:0}
+.card.flush{padding:0;overflow:hidden}
+.card.subtle{background:var(--surface-2);box-shadow:none}
+.card-head{display:flex;justify-content:space-between;align-items:center;gap:var(--s3);margin-bottom:var(--s3)}
+.card-head h2,.card-head h3{margin:0}
+.divided>*+*{border-top:1px solid var(--border);padding-top:var(--s4);margin-top:var(--s4)}
+.muted{color:var(--text-2)}.faint{color:var(--text-3)}.small{font-size:var(--f-sm)}.xs{font-size:var(--f-xs)}
+.mono{font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--f-sm)}
+.break{word-break:break-all}
+
+/* ---- Indicateurs ---- */
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:var(--s3)}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:var(--s3);margin:var(--s4) 0}
+.kpi{border:1px solid var(--border);border-radius:var(--r3);padding:var(--s3) var(--s4);background:var(--surface)}
+.kpi .tag{margin-bottom:var(--s2)}
+.count{font-size:var(--f-3xl);font-weight:650;line-height:1.1;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.kpi.red{border-color:var(--red-line);background:linear-gradient(var(--red-bg),var(--surface) 70%)}
+.kpi.orange{border-color:var(--orange-line)}.kpi.cond{border-color:var(--cond-line)}
+.num{font-variant-numeric:tabular-nums}
+
+/* ---- Badges ---- */
+.tag{display:inline-flex;align-items:center;gap:var(--s1);border:1px solid var(--info-line);border-radius:999px;padding:0 var(--s2);font-size:var(--f-xs);font-weight:600;line-height:20px;white-space:nowrap;background:var(--info-bg);color:var(--info);vertical-align:1px}
+.tag.red{background:var(--red-bg);color:var(--red);border-color:var(--red-line)}
+.tag.orange{background:var(--orange-bg);color:var(--orange);border-color:var(--orange-line)}
+.tag.cond{background:var(--cond-bg);color:var(--cond);border-color:var(--cond-line)}
+.tag.ok{background:var(--ok-bg);color:var(--ok);border-color:var(--ok-line)}
+.tag.info{background:var(--info-bg);color:var(--info);border-color:var(--info-line)}
+span.red,td .red,.text-red{color:var(--red)}
+.dot{width:8px;height:8px;border-radius:50%;display:inline-block;background:currentColor}
+mark{border-radius:var(--r1);padding:0 2px;background:var(--info-bg);color:inherit}
+mark.red{background:var(--red-bg);color:var(--red);font-weight:600;box-shadow:inset 0 -1px 0 var(--red-line)}
+mark.orange{background:var(--orange-bg);color:var(--orange);box-shadow:inset 0 -1px 0 var(--orange-line)}
+mark.cond{background:var(--cond-bg);color:var(--cond)}mark.info{background:var(--info-bg)}
+
+/* ---- Boutons ---- */
+.btn,button{display:inline-flex;align-items:center;justify-content:center;gap:var(--s2);min-height:36px;padding:0 var(--s4);border-radius:var(--r2);border:1px solid var(--accent);
+background:var(--accent);color:var(--accent-text);font:500 var(--f-md)/1 inherit;cursor:pointer;text-decoration:none;transition:background-color .12s,border-color .12s,color .12s}
+.btn:hover,button:hover{background:var(--accent-hover);border-color:var(--accent-hover);color:var(--accent-text)}
+.btn.secondary,button.secondary{background:var(--surface);color:var(--text);border-color:var(--border-strong)}
+.btn.secondary:hover,button.secondary:hover{background:var(--surface-2);color:var(--text);border-color:var(--border-strong)}
+.btn.ghost{background:transparent;border-color:transparent;color:var(--text-2)}.btn.ghost:hover{background:var(--surface-2);color:var(--text)}
+.btn.sm,button.sm{min-height:28px;padding:0 var(--s3);font-size:var(--f-sm)}
+button.link{background:none;border:0;color:var(--text-2);padding:var(--s1) var(--s3);min-height:28px;font-weight:500}
+button.link:hover{color:var(--text);background:var(--surface-2)}
+button:disabled,.btn[aria-disabled="true"]{opacity:.55;cursor:not-allowed}
+.actions{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center}
+.actions form{display:inline;margin:0}
+
+/* ---- Formulaires ---- */
+label{display:block;margin:var(--s4) 0 var(--s1);font-size:var(--f-md);font-weight:550;color:var(--text)}
+label.inline{display:flex;gap:var(--s2);align-items:flex-start;font-weight:400;margin:var(--s3) 0;color:var(--text-2)}
+label.inline input{margin-top:3px}
+.hint{font-size:var(--f-sm);color:var(--text-3);margin-top:var(--s1)}
+input,select,textarea{font:inherit;font-size:var(--f-md);padding:var(--s2) var(--s3);min-height:36px;border:1px solid var(--border-strong);border-radius:var(--r2);background:var(--surface);color:var(--text);max-width:100%;transition:border-color .12s,box-shadow .12s}
+input[type=checkbox],input[type=radio]{min-height:0;accent-color:var(--accent)}
+input:hover,select:hover,textarea:hover{border-color:var(--text-3)}
+input:focus-visible,select:focus-visible,textarea:focus-visible{outline:none;border-color:var(--focus);box-shadow:0 0 0 3px color-mix(in srgb,var(--focus) 28%,transparent)}
+input::placeholder,textarea::placeholder{color:var(--text-3)}
+input[type=file]{padding:var(--s2);background:var(--surface-2);border-style:dashed;width:100%}
+textarea{width:100%;min-height:200px;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:var(--f-sm);line-height:1.5}
+.w-full{width:100%}
+.row{display:flex;gap:var(--s3);flex-wrap:wrap;align-items:end}.row>div{min-width:0}
+.grow{flex:1;min-width:220px}
+.seg{display:inline-flex;padding:2px;gap:2px;border:1px solid var(--border);border-radius:var(--r3);background:var(--surface-2)}
+.seg label{margin:0;display:inline-flex;align-items:center;gap:var(--s2);font-weight:500;font-size:var(--f-sm);color:var(--text-2);padding:var(--s1) var(--s3);border-radius:var(--r2);cursor:pointer}
+.seg input{position:absolute;opacity:0;pointer-events:none}
+.seg label:has(input:checked){background:var(--surface);color:var(--text);box-shadow:var(--shadow);outline:1px solid var(--border)}
+.seg label:has(input:focus-visible){outline:2px solid var(--focus)}
+form.review{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;margin-top:var(--s2)}
+form.review input[name=comment]{flex:1;min-width:180px}
+form.review select,form.review input,form.review button{min-height:32px;font-size:var(--f-sm)}
+fieldset{border:0;margin:0;padding:0}
+form.decision{display:flex;flex-direction:column;gap:var(--s2);margin-top:var(--s4);padding-top:var(--s4);border-top:1px solid var(--border)}
+form.decision .row{align-items:center}
+.filter{width:100%;max-width:360px}
+
+form:has(#src-url:checked) .src-text,form:has(#src-text:checked) .src-url{display:none}
+legend{padding:0}
+details.compo{margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--border)}
+.form-foot{margin-top:var(--s5);padding-top:var(--s4);border-top:1px solid var(--border)}
+
+/* ---- Tableaux ---- */
+.scroll{overflow-x:auto}
+table{border-collapse:separate;border-spacing:0;width:100%;font-size:var(--f-md)}
+th{font-size:var(--f-xs);font-weight:600;text-transform:uppercase;letter-spacing:.04em;color:var(--text-3);background:var(--surface-2);position:sticky;top:0}
+th,td{text-align:left;vertical-align:top;padding:var(--s2) var(--s3);border-bottom:1px solid var(--border)}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td,table tr:hover td{background:color-mix(in srgb,var(--surface-2) 60%,transparent)}
+.card.flush table th:first-child,.card.flush table td:first-child{padding-left:var(--s6)}
+.card.flush table th:last-child,.card.flush table td:last-child{padding-right:var(--s6)}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.card.flush .pad{padding-left:var(--s6);padding-right:var(--s6)}.card.flush .card-head.pad{padding-top:var(--s5)}
+
+/* ---- Repliables ---- */
+details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--s2);color:var(--text-2);font-size:var(--f-md);border-radius:var(--r1)}
+details>summary::-webkit-details-marker{display:none}
+details>summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .12s;flex:none;margin-right:var(--s1)}
+details[open]>summary::before{transform:rotate(45deg)}
+details>summary:hover{color:var(--text)}
+details[open]>summary{margin-bottom:var(--s3)}
+details.card>summary{color:var(--text)}
+
+/* ---- Constats ---- */
+.finding-list{display:flex;flex-direction:column;gap:var(--s3)}
+.passage{font-size:var(--f-base);line-height:1.65;padding:var(--s3) var(--s4);background:var(--surface-2);border-radius:var(--r2);border-left:3px solid var(--border-strong);margin-bottom:var(--s3)}
+.passage.red{border-left-color:var(--red)}
+.finding{display:grid;grid-template-columns:auto 1fr;gap:var(--s1) var(--s3);align-items:start;padding:var(--s2) 0}
+.finding+.finding{border-top:1px dashed var(--border)}
+.finding .body{min-width:0}.finding .q{font-weight:600}
+.finding .meta{font-size:var(--f-sm);color:var(--text-3);margin-top:var(--s1)}
+.prio{counter-reset:p;list-style:none;padding:0;margin:0}
+.prio li{counter-increment:p;display:grid;grid-template-columns:28px 1fr;gap:var(--s3);padding:var(--s3) 0;border-top:1px solid var(--border);margin:0}
+.prio li:first-child{border-top:0;padding-top:0}
+.prio li::before{content:counter(p);width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:var(--f-xs);font-weight:650;background:var(--red-bg);color:var(--red);border:1px solid var(--red-line)}
+.product{display:flex;gap:var(--s5);align-items:flex-start;flex-wrap:wrap}
+.product img{width:88px;height:88px;object-fit:contain;border:1px solid var(--border);border-radius:var(--r3);background:#fff;padding:var(--s1)}
+.product .info{flex:1;min-width:240px}
+.product h1{margin:var(--s1) 0 var(--s2);font-size:var(--f-2xl)}
+.meta-line{display:flex;gap:var(--s2);flex-wrap:wrap;align-items:center;font-size:var(--f-sm);color:var(--text-2)}
+.meta-line .sep::before{content:"·";color:var(--text-3)}
+.claim{padding:var(--s3) 0;border-top:1px solid var(--border)}.claim:first-of-type{border-top:0}
+.claim .meta{font-size:var(--f-sm);color:var(--text-3);margin-top:var(--s1)}
+.callout{display:flex;gap:var(--s3);align-items:flex-start;padding:var(--s3) var(--s4);border-radius:var(--r2);border:1px solid var(--info-line);background:var(--info-bg);font-size:var(--f-md)}
+.callout.red{border-color:var(--red-line);background:var(--red-bg)}
+.callout.warn{border-color:var(--orange-line);background:var(--orange-bg)}
+.error{background:var(--red-bg);color:var(--red);border:1px solid var(--red-line);padding:var(--s3) var(--s4);border-radius:var(--r2);font-size:var(--f-md)}
+.progress{height:6px;border-radius:999px;background:var(--surface-3);overflow:hidden;margin:var(--s3) 0}
+.progress>span{display:block;height:100%;background:var(--accent);border-radius:999px;transition:width .3s}
+.w-0{width:0%}.w-5{width:5%}.w-10{width:10%}.w-15{width:15%}.w-20{width:20%}.w-25{width:25%}.w-30{width:30%}.w-35{width:35%}.w-40{width:40%}.w-45{width:45%}.w-50{width:50%}.w-55{width:55%}.w-60{width:60%}.w-65{width:65%}.w-70{width:70%}.w-75{width:75%}.w-80{width:80%}.w-85{width:85%}.w-90{width:90%}.w-95{width:95%}.w-100{width:100%}
+textarea.short{min-height:120px}
+.empty{text-align:center;padding:var(--s10) var(--s6);color:var(--text-2)}
+.list-plain{list-style:none;padding:0;margin:0}.list-plain li{padding:var(--s2) 0;border-top:1px solid var(--border);margin:0}
+.list-plain li:first-child{border-top:0}
+.list-plain a{text-decoration:none;color:var(--text);font-weight:500}.list-plain a:hover{color:var(--accent)}
+
+/* ---- Pages publiques ---- */
+.hero{padding:var(--s12) 0 var(--s10);max-width:760px}
+.hero h1{font-size:40px;line-height:1.1;letter-spacing:-.025em;margin-bottom:var(--s4)}
+.hero .lead{font-size:var(--f-lg);color:var(--text-2);line-height:1.6;margin-bottom:var(--s6)}
+.feature .icon{width:32px;height:32px;border-radius:var(--r2);display:grid;place-items:center;background:var(--accent-soft);color:var(--accent);font-weight:650;margin-bottom:var(--s3)}
+.auth{max-width:440px;margin:var(--s8) auto}
+.auth h1{font-size:var(--f-xl)}
+.plans .card{display:flex;flex-direction:column}.plans .price{font-size:var(--f-xl);font-weight:650;margin:var(--s2) 0 var(--s3)}
+
+/* ---- Impression ---- */
+@media print{header,.banner,.trial,.noprint,.skip{display:none!important}body{background:#fff;color:#000}main{max-width:none;padding:0}
+.card{box-shadow:none;break-inside:avoid;border-color:#bbb}a{color:#000;text-decoration:none}}
+@media (max-width:640px){main{padding:var(--s5) var(--s4) var(--s10)}header{padding:var(--s2) var(--s4)}.card{padding:var(--s4)}.hero h1{font-size:30px}}
 """
 
 T = {
 "base": """<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>{{ title }} — {{ app_name }}</title><meta name="robots" content="noindex,nofollow"><style>{{ css }}</style></head><body>
-<header><a class="brand" href="/">{{ app_name }}</a><nav>
-{% if user %}<a href="/app">Analyser</a><a href="/app/audit">Audit de site</a><a href="/app/base">Base réglementaire</a><a href="/app/avis">Mes avis</a><a href="/tarifs">Tarifs</a>
-{% if acc.admin %}<a href="/admin">Admin</a>{% endif %}
+<title>{{ title }} — {{ app_name }}</title><meta name="robots" content="noindex,nofollow"><meta name="color-scheme" content="light dark"><style>{{ css }}</style></head><body>
+<a class="skip" href="#contenu">Aller au contenu</a>
+{% set path = request.url.path %}
+<header><a class="brand" href="{{ '/app' if user else '/' }}"><span class="mark" aria-hidden="true">{{ app_name[:1]|upper }}</span>{{ app_name }}</a>
+<nav aria-label="Navigation principale">
+{% if user %}<a href="/app" {% if path == '/app' or path.startswith('/app/analyses') %}aria-current="page"{% endif %}>Analyser</a>
+<a href="/app/audit" {% if path.startswith('/app/audit') %}aria-current="page"{% endif %}>Audit de site</a>
+<a href="/app/base" {% if path.startswith('/app/base') %}aria-current="page"{% endif %}>Base réglementaire</a>
+<a href="/app/avis" {% if path.startswith('/app/avis') %}aria-current="page"{% endif %}>Mes avis</a>
+<a href="/tarifs" {% if path == '/tarifs' %}aria-current="page"{% endif %}>Tarifs</a>
+{% if acc.admin %}<a href="/admin" {% if path.startswith('/admin') %}aria-current="page"{% endif %}>Admin</a>{% endif %}
+<span class="sep" aria-hidden="true"></span>
 <form method="post" action="/deconnexion"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Se déconnecter</button></form>
-{% else %}<a href="/tarifs">Tarifs</a><a href="/connexion">Connexion</a><a class="btn" href="/essai">Essai gratuit</a>{% endif %}</nav></header>
-<div class="banner">Version de démonstration. Base réglementaire en brouillon, en cours de validation par un expert. Pré-analyse automatique et non exhaustive : ne constitue pas un avis juridique.</div>
+{% else %}<a href="/tarifs" {% if path == '/tarifs' %}aria-current="page"{% endif %}>Tarifs</a><a href="/connexion" {% if path == '/connexion' %}aria-current="page"{% endif %}>Connexion</a><span class="sep" aria-hidden="true"></span><a class="btn sm" href="/essai">Essai gratuit</a>{% endif %}</nav></header>
+<div class="banner" role="note">Version de démonstration. Base réglementaire en brouillon, en cours de validation par un expert. Pré-analyse automatique et non exhaustive : ne constitue pas un avis juridique.</div>
 {% if user and acc.active and not acc.admin %}<div class="trial">Essai gratuit : accès complet, encore {{ acc.days_left }} jour(s).</div>{% endif %}
-<main>{% block content %}{% endblock %}</main></body></html>""",
+<main id="contenu">{% block content %}{% endblock %}</main></body></html>""",
 
 "macros": """{% macro review(t, c, latest, csrf, next) -%}
 <form method="post" action="/app/avis" class="review"><input type="hidden" name="csrf" value="{{ csrf }}">
@@ -639,124 +856,133 @@ T = {
 {%- endmacro %}""",
 
 "landing": """{% extends "base" %}{% block content %}
-<div class="card"><h1>Repérez les allégations santé à risque, sans perdre vos mots-clés</h1>
-<p>Collez une fiche produit, un article ou une URL : l'outil repère les formulations à revoir au regard des règlements européens sur les allégations, vérifie les conditions de dose et propose les allégations autorisées applicables à votre composition.</p>
-<p><a class="btn" href="/essai">Essai gratuit : toutes les fonctionnalités pendant {{ trial_days }} jours</a> <span class="muted">Sans carte bancaire.</span></p></div>
-<div class="grid"><div class="card"><h3>Pré-analyse</h3><p>Lexique, conditions de dose, mentions obligatoires, références générales, vigilance.</p></div>
-<div class="card"><h3>Allégations utilisables</h3><p>Pour chaque ingrédient déclaré : les allégations autorisées, leur condition, et des formulations validées.</p></div>
-<div class="card"><h3>Base réglementaire</h3><p>Consultable et commentable : chaque élément peut être validé, corrigé ou rejeté par un expert.</p></div></div>
+<section class="hero"><div class="eyebrow">Compléments alimentaires · Règlements (CE) 1924/2006 et (UE) 432/2012</div>
+<h1>Repérez les allégations santé à risque, sans perdre vos mots-clés</h1>
+<p class="lead">Collez une fiche produit, un article ou une URL : l'outil repère les formulations à revoir au regard des règlements européens sur les allégations, vérifie les conditions de dose et propose les allégations autorisées applicables à votre composition.</p>
+<div class="actions"><a class="btn" href="/essai">Essai gratuit : toutes les fonctionnalités pendant {{ trial_days }} jours</a><span class="muted small">Sans carte bancaire.</span></div></section>
+<div class="grid">
+<div class="card feature"><div class="icon" aria-hidden="true">1</div><h3>Pré-analyse</h3><p class="muted">Lexique, conditions de dose, mentions obligatoires, références générales, vigilance.</p></div>
+<div class="card feature"><div class="icon" aria-hidden="true">2</div><h3>Allégations utilisables</h3><p class="muted">Pour chaque ingrédient déclaré : les allégations autorisées, leur condition, et des formulations validées.</p></div>
+<div class="card feature"><div class="icon" aria-hidden="true">3</div><h3>Base réglementaire</h3><p class="muted">Consultable et commentable : chaque élément peut être validé, corrigé ou rejeté par un expert.</p></div></div>
 {% endblock %}""",
 
-"signup": """{% extends "base" %}{% block content %}<div class="card" style="max-width:520px">
-<h1>Essai gratuit</h1><p>Accès complet à toutes les fonctionnalités pendant {{ trial_days }} jours. Sans carte bancaire.</p>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+"signup": """{% extends "base" %}{% block content %}<div class="auth"><div class="card">
+<h1>Essai gratuit</h1><p class="muted">Accès complet à toutes les fonctionnalités pendant {{ trial_days }} jours. Sans carte bancaire.</p>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/essai"><input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="name">Nom</label><input id="name" name="name" required maxlength="200" value="{{ form.name or '' }}">
-<label for="email">E-mail professionnel</label><input id="email" type="email" name="email" required maxlength="200" value="{{ form.email or '' }}">
-<label for="password">Mot de passe (10 caractères minimum)</label><input id="password" type="password" name="password" required minlength="10">
-<label><input type="checkbox" name="terms" value="1" required> J'ai compris qu'il s'agit d'une version de démonstration et que la pré-analyse ne constitue pas un avis juridique.</label>
-<p><button>Démarrer l'essai</button></p></form><p class="muted">Déjà un compte ? <a href="/connexion">Connexion</a></p></div>{% endblock %}""",
+<label for="name">Nom</label><input class="w-full" id="name" name="name" required maxlength="200" autocomplete="name" value="{{ form.name or '' }}">
+<label for="email">E-mail professionnel</label><input class="w-full" id="email" type="email" name="email" required maxlength="200" autocomplete="email" value="{{ form.email or '' }}">
+<label for="password">Mot de passe (10 caractères minimum)</label><input class="w-full" id="password" type="password" name="password" required minlength="10" autocomplete="new-password">
+<label class="inline"><input type="checkbox" name="terms" value="1" required> J'ai compris qu'il s'agit d'une version de démonstration et que la pré-analyse ne constitue pas un avis juridique.</label>
+<p><button class="w-full">Démarrer l'essai</button></p></form></div><p class="muted small">Déjà un compte ? <a href="/connexion">Connexion</a></p></div>{% endblock %}""",
 
-"login": """{% extends "base" %}{% block content %}<div class="card" style="max-width:460px"><h1>Connexion</h1>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
+"login": """{% extends "base" %}{% block content %}<div class="auth"><div class="card"><h1>Connexion</h1>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
 <form method="post" action="/connexion"><input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="email">E-mail</label><input id="email" type="email" name="email" required>
-<label for="password">Mot de passe</label><input id="password" type="password" name="password" required>
-<p><button>Se connecter</button></p></form></div>{% endblock %}""",
+<label for="email">E-mail</label><input class="w-full" id="email" type="email" name="email" required autocomplete="email">
+<label for="password">Mot de passe</label><input class="w-full" id="password" type="password" name="password" required autocomplete="current-password">
+<p><button class="w-full">Se connecter</button></p></form></div><p class="muted small">Pas encore de compte ? <a href="/essai">Essai gratuit</a></p></div>{% endblock %}""",
 
-"expired": """{% extends "base" %}{% block content %}<div class="card"><h1>Votre essai est terminé</h1>
-<p>Vos avis restent consultables et exportables depuis <a href="/app/avis">Mes avis</a>. Pour prolonger l'accès, contactez-nous.</p></div>{% endblock %}""",
+"expired": """{% extends "base" %}{% block content %}<div class="auth"><div class="card"><h1>Votre essai est terminé</h1>
+<p class="muted">Vos avis restent consultables et exportables depuis <a href="/app/avis">Mes avis</a>. Pour prolonger l'accès, contactez-nous.</p></div></div>{% endblock %}""",
 
 "app": """{% extends "base" %}{% block content %}
-<div class="card"><h1>Analyser une page</h1>
-<p class="muted">Exemples prêts à l'emploi :
-{% for e in examples %}<a href="/app?exemple={{ e.id }}">{{ e.title }}</a>{% if not loop.last %} · {% endif %}{% endfor %}</p>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
-<form method="post" action="/app/analyser"><input type="hidden" name="csrf" value="{{ csrf }}">
-<label>Source</label>
-<label style="font-weight:400"><input type="radio" name="source" value="texte" {% if src != 'url' %}checked{% endif %}> Texte ou HTML collé</label>
-<label style="font-weight:400"><input type="radio" name="source" value="url" {% if src == 'url' %}checked{% endif %}> URL publique (sans exécution du JavaScript de la page)</label>
-<label for="text">Texte ou HTML</label><textarea id="text" name="text">{{ prefill.text }}</textarea>
-<label for="url">URL</label><input id="url" name="url" type="url" style="width:100%" placeholder="https://…" value="{{ prefill.url or '' }}">
-<p class="muted">Pour plusieurs pages, un sitemap ou des fichiers : <a href="/app/audit">audit de site</a>.</p>
+<div class="page-head"><div><h1>Analyser une page</h1><div class="sub">Une fiche produit, un article ou une URL. Pour plusieurs pages, un sitemap ou des fichiers : <a href="/app/audit">audit de site</a>.</div></div></div>
+<div class="layout"><div>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/app/analyser" class="card"><input type="hidden" name="csrf" value="{{ csrf }}">
+<fieldset><legend class="eyebrow">Source</legend>
+<div class="seg" role="radiogroup" aria-label="Source">
+<label><input type="radio" name="source" value="url" id="src-url" {% if src == 'url' %}checked{% endif %}> URL publique</label>
+<label><input type="radio" name="source" value="texte" id="src-text" {% if src != 'url' %}checked{% endif %}> Texte ou HTML collé</label></div></fieldset>
+<div class="src-url"><label for="url">URL</label><input class="w-full" id="url" name="url" type="url" placeholder="https://www.marque.fr/products/…" value="{{ prefill.url or '' }}">
+<p class="hint">Sans exécution du JavaScript de la page. Seul le contenu principal est analysé : menus, produits suggérés et pied de page sont écartés.</p></div>
+<div class="src-text"><label for="text">Texte ou HTML</label><textarea id="text" name="text">{{ prefill.text }}</textarea></div>
 <div class="row"><div><label for="mode">Type de page</label><select id="mode" name="mode">
 <option value="AUTO" {% if prefill.mode not in ('PRODUCT_PAGE', 'EDITORIAL_BLOG') %}selected{% endif %}>Détection automatique</option>
 <option value="PRODUCT_PAGE" {% if prefill.mode == 'PRODUCT_PAGE' %}selected{% endif %}>Fiche produit</option>
 <option value="EDITORIAL_BLOG" {% if prefill.mode == 'EDITORIAL_BLOG' %}selected{% endif %}>Article de blog</option></select></div>
-<div><label for="product_name">Nom du produit (facultatif)</label><input id="product_name" name="product_name" value="{{ prefill.product_name }}"></div></div>
-<label>Composition par portion journalière (facultatif : sinon, elle est détectée dans la page)</label>
+<div class="grow"><label for="product_name">Nom du produit (facultatif)</label><input class="w-full" id="product_name" name="product_name" value="{{ prefill.product_name }}"></div></div>
+<details {% if prefill.composition %}open{% endif %} class="compo"><summary>Composition par portion journalière (facultatif : sinon, elle est détectée dans la page)</summary>
 <div class="scroll"><table><tr><th>Ingrédient</th><th>Quantité</th><th>Unité</th></tr>
 {% for i in range(1, 9) %}{% set c = prefill.composition[i-1] if prefill.composition|length >= i else None %}<tr>
-<td><select name="sub_{{ i }}" aria-label="Ingrédient {{ i }}"><option value="">—</option>{% for s in substances %}<option value="{{ s.code }}" {% if c and c.substance == s.code %}selected{% endif %}>{{ s.name_fr }}</option>{% endfor %}</select></td>
+<td><select class="w-full" name="sub_{{ i }}" aria-label="Ingrédient {{ i }}"><option value="">—</option>{% for s in substances %}<option value="{{ s.code }}" {% if c and c.substance == s.code %}selected{% endif %}>{{ s.name_fr }}</option>{% endfor %}</select></td>
 <td><input name="amount_{{ i }}" inputmode="decimal" size="8" aria-label="Quantité {{ i }}" value="{{ c.amount if c else '' }}"></td>
-<td><select name="unit_{{ i }}" aria-label="Unité {{ i }}">{% for u in units %}<option {% if c and c.unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></td></tr>{% endfor %}</table></div>
-<p><button>Lancer la pré-analyse</button></p></form></div>
-{% if recent %}<div class="card"><h2>Analyses récentes</h2><ul>{% for a in recent %}<li><a href="/app/analyses/{{ a.id }}">{{ a.title }}</a> <span class="muted">{{ a.date }}</span></li>{% endfor %}</ul></div>{% endif %}
+<td><select name="unit_{{ i }}" aria-label="Unité {{ i }}">{% for u in units %}<option {% if c and c.unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></td></tr>{% endfor %}</table></div></details>
+<div class="actions form-foot"><button>Lancer la pré-analyse</button></div></form></div>
+<aside class="stack">
+<div class="card"><h3>Exemples prêts à l'emploi</h3><ul class="list-plain small">{% for e in examples %}<li><a href="/app?exemple={{ e.id }}">{{ e.title }}</a></li>{% endfor %}</ul></div>
+{% if recent %}<div class="card"><h3>Analyses récentes</h3><ul class="list-plain small">{% for a in recent %}<li><a href="/app/analyses/{{ a.id }}">{{ a.title }}</a><div class="faint xs">{{ a.date }}</div></li>{% endfor %}</ul></div>{% endif %}
+</aside></div>
 {% endblock %}""",
 
 "result": """{% extends "base" %}{% block content %}
-<p><a href="/app">← Nouvelle analyse</a>{% if r.audit_id %} · <a href="/app/audits/{{ r.audit_id }}">← Retour à l'audit</a>{% endif %}</p>
-<div class="card">
-{% if r.product and r.product.name %}<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
-{% if r.product.image %}<img src="{{ r.product.image }}" alt="" style="width:96px;height:96px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff" referrerpolicy="no-referrer">{% endif %}
-<div style="flex:1;min-width:220px"><p class="muted" style="margin:0">{{ 'Fiche produit détectée' if r.mode == 'PRODUCT_PAGE' else 'Article détecté' }}{% if r.product.brand %} · {{ r.product.brand }}{% endif %}{% if r.product.category %} · {{ r.product.category }}{% endif %}</p>
-<h1 style="margin:4px 0">{{ r.product.name }}</h1>
-<p class="muted" style="margin:0;word-break:break-all">{{ r.source }}</p></div></div>
-{% else %}<h1>Résultat de la pré-analyse</h1><p class="muted">{{ r.source }} · {{ 'Fiche produit' if r.mode == 'PRODUCT_PAGE' else 'Article de blog' }}</p>{% endif %}
-<div class="grid" style="margin-top:12px">{% for k, lbl in levels.items() if k != 'INFO' %}<div><span class="tag {{ lbl[1] }}">{{ lbl[0] }}</span><div class="count">{{ r.counts.get(k, 0) }}</div></div>{% endfor %}</div>
-{% if not r.has_points %}<p>Aucun passage relevé par la pré-analyse automatique sur ce périmètre. Cela ne vaut pas validation.</p>{% endif %}
-{% if r.scope and r.scope.used_main %}<p class="muted">Périmètre : contenu principal de la page ({{ r.scope.nodes }} passages).{% if r.scope.dropped %} Écartés : {{ r.scope.dropped|join(', ') }}.{% endif %}{% if r.reviews and r.reviews.count %} Avis clients : {{ r.reviews.count }}, présentés à part.{% endif %}</p>{% endif %}
-<p class="muted">Base {{ r.kb_release }} · {{ r.created }}</p>
-{% if r.flagged %}<p>{% if ai_enabled %}<form method="post" action="/app/analyses/{{ aid }}/reecrire" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Proposer des réécritures (IA)</button></form> {% endif %}<a class="btn" href="/app/analyses/{{ aid }}/propositions">Propositions et décisions</a> <a href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a></p>{% else %}<p><a href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a></p>{% endif %}
+<nav class="crumb" aria-label="Fil d'Ariane"><a href="/app">← Nouvelle analyse</a>{% if r.audit_id %}<a href="/app/audits/{{ r.audit_id }}">← Retour à l'audit</a>{% endif %}</nav>
+<section class="card">
+{% if r.product and r.product.name %}<div class="product">
+{% if r.product.image %}<img src="{{ r.product.image }}" alt="" referrerpolicy="no-referrer">{% endif %}
+<div class="info"><div class="meta-line"><span>{{ 'Fiche produit détectée' if r.mode == 'PRODUCT_PAGE' else 'Article détecté' }}</span>{% if r.product.brand %}<span class="sep"></span><span>{{ r.product.brand }}</span>{% endif %}{% if r.product.category %}<span class="sep"></span><span>{{ r.product.category }}</span>{% endif %}</div>
+<h1>{{ r.product.name }}</h1>
+<div class="faint small break">{{ r.source }}</div></div></div>
+{% else %}<h1>Résultat de la pré-analyse</h1><div class="meta-line"><span class="break">{{ r.source }}</span><span class="sep"></span><span>{{ 'Fiche produit' if r.mode == 'PRODUCT_PAGE' else 'Article de blog' }}</span></div>{% endif %}
+<div class="kpis">{% for k, lbl in levels.items() if k != 'INFO' %}<div class="kpi {{ lbl[1] if r.counts.get(k, 0) else '' }}"><span class="tag {{ lbl[1] }}">{{ lbl[0] }}</span><div class="count">{{ r.counts.get(k, 0) }}</div></div>{% endfor %}</div>
+{% if not r.has_points %}<p class="callout">Aucun passage relevé par la pré-analyse automatique sur ce périmètre. Cela ne vaut pas validation.</p>{% endif %}
+{% if r.scope and r.scope.used_main %}<p class="muted small">Périmètre : contenu principal de la page ({{ r.scope.nodes }} passages).{% if r.scope.dropped %} Écartés : {{ r.scope.dropped|join(', ') }}.{% endif %}{% if r.reviews and r.reviews.count %} Avis clients : {{ r.reviews.count }}, présentés à part.{% endif %}</p>{% endif %}
+<div class="actions">{% if r.flagged %}{% if ai_enabled %}<form method="post" action="/app/analyses/{{ aid }}/reecrire"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Proposer des réécritures (IA)</button></form>{% endif %}
+<a class="btn secondary" href="/app/analyses/{{ aid }}/propositions">Propositions et décisions</a>{% endif %}
+<a class="btn ghost" href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a><span class="faint xs">Base {{ r.kb_release }} · {{ r.created }}</span></div>
+</section>
+
+{% if r.ai_error %}<p class="callout warn"><span><strong>Extraction IA indisponible</strong> : seules les règles et le lexique ont été appliqués. <span class="muted">Détail technique : {{ r.ai_error }}</span></span></p>{% endif %}
+
+{% if r.priorities %}<section class="card"><div class="card-head"><h2>À traiter en premier</h2><span class="tag red">{{ r.priorities|length }}</span></div>
+<ol class="prio">{% for f in r.priorities %}<li><div><span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}{% if f.legal %}<div class="faint small">{{ f.legal }}</div>{% endif %}</div></li>{% endfor %}</ol></section>{% endif %}
+
+<div class="grid">
+{% if r.composition_source %}<section class="card"><h2>Composition {{ {'declaree': 'déclarée', 'detectee': 'détectée dans la page', 'absente': ''}[r.composition_source] }}</h2>
+{% if r.composition_source == 'detectee' %}<p class="muted small">Repérée automatiquement : vérifiez-la. Les doses servent à décider si une allégation est utilisable.</p>
+<ul class="list-plain">{% for d in r.detected %}<li><strong>{{ d.label }}</strong> : <span class="num">{{ d.amount|num }} {{ d.unit }}</span><div class="faint small">« {{ d.evidence }} »</div></li>{% endfor %}</ul>
+{% elif r.composition_source == 'declaree' %}<ul class="list-plain">{% for c in r.composition %}<li>{{ c.label }} : <span class="num">{{ c.amount|num }} {{ c.unit }}</span></li>{% endfor %}</ul>
+{% else %}<p class="muted small">Aucune quantité d'ingrédient de la base n'a été trouvée dans la page. Sans composition, les allégations ne peuvent pas être vérifiées.</p>{% endif %}
+{% if r.source != 'Texte collé' %}<p class="small"><a href="/app?reprise={{ aid }}">Relancer avec une composition corrigée</a></p>{% endif %}</section>{% endif %}
+
+{% if r.rejected %}<section class="card"><h2>Ingrédients sans allégation de santé autorisée</h2>
+{% for x in r.rejected %}<div class="claim"><span class="tag red">Aucune allégation autorisée</span> <strong>{{ x.name }}</strong>
+<p class="small muted">Le registre de l'Union recense {{ x.count }} demande(s) d'allégation refusée(s) pour cet ingrédient. Toute promesse de santé qui lui est attribuée est à revoir.</p>
+<details><summary class="small">Exemples de demandes refusées (texte officiel, en anglais)</summary><ul class="small">{% for e in x.examples %}<li>« {{ e.claim }} » <span class="faint">({{ e.substance }} · {{ e.id }})</span></li>{% endfor %}</ul></details></div>{% endfor %}
+<p class="faint xs">Source : registre de l'Union des allégations nutritionnelles et de santé (Commission européenne).</p></section>{% endif %}
 </div>
-
-{% if r.composition_source %}<div class="card"><h2>Composition {{ {'declaree': 'déclarée', 'detectee': 'détectée dans la page', 'absente': ''}[r.composition_source] }}</h2>
-{% if r.composition_source == 'detectee' %}<p class="muted">Repérée automatiquement : vérifiez-la. Les doses servent à décider si une allégation est utilisable.</p>
-<ul>{% for d in r.detected %}<li><strong>{{ d.label }}</strong> : {{ d.amount|num }} {{ d.unit }} <span class="muted">— « {{ d.evidence }} »</span></li>{% endfor %}</ul>
-{% elif r.composition_source == 'declaree' %}<ul>{% for c in r.composition %}<li>{{ c.label }} : {{ c.amount|num }} {{ c.unit }}</li>{% endfor %}</ul>
-{% else %}<p class="muted">Aucune quantité d'ingrédient de la base n'a été trouvée dans la page. Sans composition, les allégations ne peuvent pas être vérifiées.</p>{% endif %}
-{% if r.source != 'Texte collé' %}<p><a href="/app?reprise={{ aid }}">Relancer avec une composition corrigée</a></p>{% endif %}</div>{% endif %}
-
-{% if r.rejected %}<div class="card"><h2>Ingrédients sans allégation de santé autorisée</h2>
-{% for x in r.rejected %}<div style="margin:8px 0"><span class="tag red">Aucune allégation autorisée</span> <strong>{{ x.name }}</strong>
-<p>Le registre de l'Union recense {{ x.count }} demande(s) d'allégation refusée(s) pour cet ingrédient. Toute promesse de santé qui lui est attribuée est à revoir.</p>
-<details><summary>Exemples de demandes refusées (texte officiel, en anglais)</summary><ul>{% for e in x.examples %}<li>« {{ e.claim }} » <span class="muted">({{ e.substance }} · {{ e.id }})</span></li>{% endfor %}</ul></details></div>{% endfor %}
-<p class="muted">Source : registre de l'Union des allégations nutritionnelles et de santé (Commission européenne).</p></div>{% endif %}
-
-{% if r.ai_error %}<div class="card muted"><strong>Extraction IA indisponible</strong> : seules les règles et le lexique ont été appliqués. Détail technique : {{ r.ai_error }}</div>{% endif %}
-
-{% if r.priorities %}<div class="card"><h2>À traiter en premier</h2><ol>{% for f in r.priorities %}<li style="margin:6px 0"><strong>« {{ f.quote }} »</strong> — {{ f.explanation }}{% if f.legal %} <span class="muted">({{ f.legal }})</span>{% endif %}</li>{% endfor %}</ol></div>{% endif %}
 
 {% set reds = r.nodes|selectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else r.nodes %}
 {% set others = r.nodes|rejectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else [] %}
-{% macro node_card(n) %}<div class="card"><p>{{ n.html|safe }}</p>
-{% for f in n.findings %}<div style="margin:8px 0"><span class="tag {{ f.css }}">{{ f.level_label }}</span>{% if f.ai %} <span class="tag info">IA</span>{% endif %} <strong>« {{ f.quote }} »</strong> — {{ f.explanation }}
-{% if f.legal %}<div class="muted">Fondement : {{ f.legal }}</div>{% endif %}
-{% if f.remediations %}<div class="muted">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div>{% endfor %}</div>{% endmacro %}
-{% if reds %}<h2>Passages à revoir en priorité ({{ reds|length }})</h2>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
-{% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary>{% for n in others %}{{ node_card(n) }}{% endfor %}</details>{% endif %}
+{% macro node_card(n) %}<article class="card"><p class="passage {{ 'red' if n.has_red }}">{{ n.html|safe }}</p>
+{% for f in n.findings %}<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{% if f.ai %}<span class="tag info">IA</span> {% endif %}<span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}
+{% if f.legal %}<div class="meta">Fondement : {{ f.legal }}</div>{% endif %}
+{% if f.remediations %}<div class="meta">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div></div>{% endfor %}</article>{% endmacro %}
+{% if reds %}<div class="section-title"><h2>Passages à revoir en priorité ({{ reds|length }})</h2></div>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
+{% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary><div class="stack">{% for n in others %}{{ node_card(n) }}{% endfor %}</div></details>{% endif %}
 
-{% if r.general_refs %}<div class="card"><h2>Références générales à la santé ({{ r.general_refs|map(attribute='count')|sum }} mentions)</h2>
-<p class="muted">Un bienfait général (« peau », « articulations », « immunité ») n'est permis que s'il est accompagné d'une allégation autorisée spécifique sur la page (Règl. (CE) 1924/2006, art. 10§3). Regroupées par terme :</p>
-<div class="scroll"><table><tr><th>Terme</th><th>Occurrences</th><th>Exemples</th></tr>{% for g in r.general_refs %}<tr><td><span class="tag orange">{{ g.term }}</span></td><td>{{ g.count }}</td>
-<td><details><summary class="muted">voir</summary>{% for e in g.examples %}<p class="muted">… {{ e }} …</p>{% endfor %}</details></td></tr>{% endfor %}</table></div></div>{% endif %}
+{% if r.general_refs %}<section class="card flush"><div class="card-head pad"><h2>Références générales à la santé ({{ r.general_refs|map(attribute='count')|sum }} mentions)</h2></div>
+<p class="muted small pad">Un bienfait général (« peau », « articulations », « immunité ») n'est permis que s'il est accompagné d'une allégation autorisée spécifique sur la page (Règl. (CE) 1924/2006, art. 10§3). Regroupées par terme :</p>
+<div class="scroll"><table><tr><th>Terme</th><th class="num">Occurrences</th><th>Exemples</th></tr>{% for g in r.general_refs %}<tr><td><span class="tag orange">{{ g.term }}</span></td><td class="num">{{ g.count }}</td>
+<td><details><summary class="small">voir</summary>{% for e in g.examples %}<p class="muted small">… {{ e }} …</p>{% endfor %}</details></td></tr>{% endfor %}</table></div></section>{% endif %}
 
-{% if r.page_level %}<div class="card"><h2>Constats sur l'ensemble de la page</h2>{% for f in r.page_level if f.code != 'IA_INDISPONIBLE' %}
-<p><span class="tag {{ f.css }}">{{ f.level_label }}</span> {{ f.explanation }}{% if f.substance %} ({{ f.substance }}){% endif %}{% if f.legal %} <span class="muted">— {{ f.legal }}</span>{% endif %}</p>{% endfor %}</div>{% endif %}
-{% if r.recognized %}<div class="card"><h2>Allégations autorisées reconnues sur la page</h2><ul>{% for c in r.recognized %}
-<li><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span> {{ c.text }} <span class="muted">({{ c.code }})</span></li>{% endfor %}</ul></div>{% endif %}
-{% if r.usable %}<div class="card"><h2>Allégations utilisables pour cette composition</h2>
-{% for u in r.usable %}<details style="border-top:1px solid var(--line);padding:8px 0"><summary><strong>{{ u.substance }}</strong> — {{ u.amount|num }} {{ u.unit }} par jour{% if u.n_ok is defined %} · {{ u.n_ok }} utilisable(s) sur {{ u.claims|length }}{% endif %}</summary>
-{% if u.pending_onhold %}<p class="muted">Plante : les allégations « on-hold » ne sont pas encore intégrées à la base.</p>{% endif %}
-{% for c in u.claims %}<div style="margin:10px 0"><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span> <strong>{{ c.text }}</strong>
-{% if c.reasons %}<div class="muted">{{ c.reasons|join(' · ') }}</div>{% endif %}
-{% if c.notices %}<div class="muted">Mention à afficher : {{ c.notices|join(' / ') }}</div>{% endif %}
-{% if c.source %}<div class="muted">Source : {% if c.source_url %}<a href="{{ c.source_url }}" rel="noopener" target="_blank">{{ c.source }}</a>{% else %}{{ c.source }}{% endif %}</div>{% endif %}
-{% if c.variants and c.status[1] != 'red' %}<details><summary>Formulations validées ({{ c.variants|length }})</summary><ul>{% for v in c.variants %}<li>{{ v }}</li>{% endfor %}</ul></details>{% endif %}</div>{% endfor %}</details>{% endfor %}</div>{% endif %}
-{% if r.reviews and r.reviews.count %}<div class="card"><h2>Avis clients ({{ r.reviews.count }})</h2>
-<p class="muted">Écartés de l'analyse principale. Un avis repris et mis en avant par la marque peut toutefois être considéré comme une allégation : {{ r.reviews.flagged|length }} contien(nen)t un terme médical.</p>
-{% if r.reviews.flagged %}<details><summary>Voir les avis concernés</summary>{% for v in r.reviews.flagged %}<p>« {{ v.html|safe }} »</p>{% endfor %}</details>{% endif %}</div>{% endif %}
-<div class="card muted"><h3>Limites de cette version</h3>{% if r.ai %}<p>Extraction et réécriture IA {% if r.ai_error %}indisponibles pour cette analyse{% else %}actives ({{ r.models|join(', ') }}){% endif %}. Les allégations botaniques « on-hold » ne sont pas encore intégrées. La base réglementaire est en cours de validation par un expert.</p>{% else %}<p>L'IA n'est pas activée pour cette analyse : seules les règles et le lexique ont été appliqués, les promesses implicites ne sont pas détectées.</p>{% endif %}</div>
+{% if r.page_level %}<section class="card"><h2>Constats sur l'ensemble de la page</h2>{% for f in r.page_level if f.code != 'IA_INDISPONIBLE' %}
+<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{{ f.explanation }}{% if f.substance %} ({{ f.substance }}){% endif %}{% if f.legal %}<div class="meta">{{ f.legal }}</div>{% endif %}</div></div>{% endfor %}</section>{% endif %}
+{% if r.recognized %}<section class="card"><h2>Allégations autorisées reconnues sur la page</h2>{% for c in r.recognized %}
+<div class="finding"><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span><div class="body">{{ c.text }} <span class="faint small">({{ c.code }})</span></div></div>{% endfor %}</section>{% endif %}
+{% if r.usable %}<section class="card"><h2>Allégations utilisables pour cette composition</h2>
+<div class="divided">{% for u in r.usable %}<details><summary><strong>{{ u.substance }}</strong> — <span class="num">{{ u.amount|num }} {{ u.unit }}</span> par jour{% if u.n_ok is defined %} · {{ u.n_ok }} utilisable(s) sur {{ u.claims|length }}{% endif %}</summary>
+{% if u.pending_onhold %}<p class="muted small">Plante : les allégations « on-hold » ne sont pas encore intégrées à la base.</p>{% endif %}
+{% for c in u.claims %}<div class="claim"><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span> <strong>{{ c.text }}</strong>
+{% if c.reasons %}<div class="meta">{{ c.reasons|join(' · ') }}</div>{% endif %}
+{% if c.notices %}<div class="meta">Mention à afficher : {{ c.notices|join(' / ') }}</div>{% endif %}
+{% if c.source %}<div class="meta">Source : {% if c.source_url %}<a href="{{ c.source_url }}" rel="noopener" target="_blank">{{ c.source }}</a>{% else %}{{ c.source }}{% endif %}</div>{% endif %}
+{% if c.variants and c.status[1] != 'red' %}<details><summary class="small">Formulations validées ({{ c.variants|length }})</summary><ul class="small">{% for v in c.variants %}<li>{{ v }}</li>{% endfor %}</ul></details>{% endif %}</div>{% endfor %}</details>{% endfor %}</div></section>{% endif %}
+{% if r.reviews and r.reviews.count %}<section class="card"><h2>Avis clients ({{ r.reviews.count }})</h2>
+<p class="muted small">Écartés de l'analyse principale. Un avis repris et mis en avant par la marque peut toutefois être considéré comme une allégation : {{ r.reviews.flagged|length }} contien(nen)t un terme médical.</p>
+{% if r.reviews.flagged %}<details><summary class="small">Voir les avis concernés</summary>{% for v in r.reviews.flagged %}<p class="passage">« {{ v.html|safe }} »</p>{% endfor %}</details>{% endif %}</section>{% endif %}
+<section class="card subtle"><h3>Limites de cette version</h3>{% if r.ai %}<p class="muted small">Extraction et réécriture IA {% if r.ai_error %}indisponibles pour cette analyse{% else %}actives ({{ r.models|join(', ') }}){% endif %}. Les allégations botaniques « on-hold » ne sont pas encore intégrées. La base réglementaire est en cours de validation par un expert.</p>{% else %}<p class="muted small">L'IA n'est pas activée pour cette analyse : seules les règles et le lexique ont été appliqués, les promesses implicites ne sont pas détectées.</p>{% endif %}</section>
 {% endblock %}""",
 
 "base_index": """{% extends "base" %}{% block content %}<div class="card"><h1>Base réglementaire</h1>
@@ -764,58 +990,58 @@ T = {
 {% if official %}<p><span class="tag ok">Import officiel</span> Sources officielles téléchargées le {{ official.retrieved_at[:10] }} : {% for src in official.sources %}<a href="{{ src.url }}" rel="noopener" target="_blank">{{ src.name }}</a>{% if src.version %} (version du {{ src.version }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}. <a href="/app/base/sources">Détail et mise à jour</a></p>
 {% else %}<p><span class="tag orange">Import officiel non effectué</span> Seule la base rédigée (lot 1) est chargée. <a href="/app/base/sources">Sources et mise à jour</a></p>{% endif %}
 <p><a href="/app/base/lexique">Lexique des formulations à risque ({{ n_lex }})</a> · <a href="/app/base/mentions">Mentions ({{ n_notices }})</a> · <a href="/app/base/taches">Tâches de revue ({{ n_tasks }})</a>{% if n_rejected %} · <a href="/app/base/refusees">Demandes refusées ({{ n_rejected }})</a>{% endif %}</p>
-<p><input id="flt" placeholder="Filtrer les ingrédients…" oninput="for(const tr of document.querySelectorAll('#subs tr[data-n]'))tr.style.display=tr.dataset.n.includes(this.value.toLowerCase())?'':'none'" style="width:100%;max-width:360px"></p></div>
-<div class="card scroll"><table id="subs"><tr><th>Ingrédient</th><th>Type</th><th>Origine</th><th>Allégations</th><th>Formulations</th><th>Motifs à risque</th><th>Avis donnés</th></tr>
+<p><input id="flt" class="filter" type="search" aria-label="Filtrer les ingrédients" placeholder="Filtrer les ingrédients…" oninput="for(const tr of document.querySelectorAll('#subs tr[data-n]'))tr.hidden=!tr.dataset.n.includes(this.value.toLowerCase())"></p></div>
+<div class="card flush scroll"><table id="subs"><tr><th>Ingrédient</th><th>Type</th><th>Origine</th><th>Allégations</th><th>Formulations</th><th>Motifs à risque</th><th>Avis donnés</th></tr>
 {% for s in rows %}<tr data-n="{{ s.name|lower }}"><td><a href="/app/base/{{ s.code }}">{{ s.name }}</a>{% if s.latin %}<div class="muted"><em>{{ s.latin }}</em></div>{% endif %}</td><td>{{ s.kind }}</td><td><span class="tag {{ 'ok' if s.origin == 'Import officiel' else 'info' }}">{{ s.origin }}</span></td><td>{{ s.claims }}</td><td>{{ s.variants }}</td><td>{{ s.risks }}</td><td>{{ s.reviewed }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 
 "substance": """{% import "macros" as m %}{% extends "base" %}{% block content %}
-<p><a href="/app/base">← Base réglementaire</a></p>
+<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>{{ s.name_fr }}</h1>{% if s.scientific_name %}<p><em>{{ s.scientific_name }}</em> · {{ s.botanical_family }}</p>{% endif %}
 {% if s.nrv_value %}<p>VNR : {{ s.nrv_value }} {{ s.nrv_unit }}</p>{% endif %}
 <p class="muted">Alias reconnus : {{ s.aliases|map(attribute='alias')|join(', ') }}</p>{{ m.review('substance', s.code, rv.get('substance:' ~ s.code), csrf, here) }}</div>
 {% if claims %}<div class="card"><h2>Allégations ({{ claims|length }})</h2>{% for c in claims %}
-<div id="{{ c.code }}" style="border-top:1px solid var(--line);padding:12px 0">{% if c.origin == 'IMPORT_OFFICIEL' %}<span class="tag ok">texte officiel importé</span>{% else %}<span class="tag {{ 'ok' if c.confidence == 'HAUTE' else 'orange' }}">confiance de saisie : {{ c.confidence }}</span>{% endif %}
+<div id="{{ c.code }}" class="claim">{% if c.origin == 'IMPORT_OFFICIEL' %}<span class="tag ok">texte officiel importé</span>{% else %}<span class="tag {{ 'ok' if c.confidence == 'HAUTE' else 'orange' }}">confiance de saisie : {{ c.confidence }}</span>{% endif %}
 <p><strong>{{ c.text_fr }}</strong> <span class="muted">({{ c.code }} · {{ c.regime }} · {{ c.text_fr_status }})</span></p>
 {% if c.source_url %}<p class="muted">Source : <a href="{{ c.source_url }}" rel="noopener" target="_blank">{{ c.text_fr_source_ref }}</a>{% if c.register_id %} · registre de l'Union {{ c.register_id }}{% endif %}{% if c.efsa_ref %} · avis EFSA {{ c.efsa_ref }}{% endif %}</p>{% endif %}
 <p class="muted">Conditions : {% for k in c.conditions %}{% if k.type == 'CONDITION_TEXTE' %}« {{ k.params.text_fr }} »{% elif k.type == 'DOSE_MIN_PORTION' %}dose minimale {{ k.params.amount }} {{ '% de la VNR' if k.params.unit == 'PCT_VNR' else k.params.unit }} ({{ 'par jour' if k.params.basis == 'PORTION_JOURNALIERE' else 'par portion' }}){% else %}{{ k.type }}{% if k.params.amount is defined %} {{ k.params.amount }} {{ k.params.unit }} ({{ k.params.basis }}){% endif %}{% endif %}{% if k.notice %} — mention : « {{ k.notice }} »{% endif %}{% if not loop.last %} ; {% endif %}{% endfor %}</p>
 <details><summary>Formulations ({{ c.variants|length }})</summary><ul>{% for v in c.variants %}<li>{{ v.text_fr }} <span class="muted">({{ v.code }})</span></li>{% endfor %}</ul></details>
 {{ m.review('allegation', c.code, rv.get('allegation:' ~ c.code), csrf, here ~ '#' ~ c.code) }}</div>{% endfor %}</div>{% endif %}
 {% if worklist %}<div class="card"><h2>Allégations « on-hold » à importer</h2><p class="muted">Aucune n'est intégrée. Thèmes à rechercher dans la liste officielle :</p>
-{% for w in worklist %}<div id="{{ w.code }}" style="padding:6px 0"><strong>{{ w.theme_fr }}</strong> (partie : {{ w.plant_part }}, confiance : {{ w.theme_confidence }}) <span class="muted">— formulations de marché, détection uniquement : {{ w.market_phrasings_detection_only|join(' / ') }}</span>
+{% for w in worklist %}<div id="{{ w.code }}" class="claim"><strong>{{ w.theme_fr }}</strong> (partie : {{ w.plant_part }}, confiance : {{ w.theme_confidence }}) <span class="muted">— formulations de marché, détection uniquement : {{ w.market_phrasings_detection_only|join(' / ') }}</span>
 {{ m.review('liste_botanique', w.code, rv.get('liste_botanique:' ~ w.code), csrf, here ~ '#' ~ w.code) }}</div>{% endfor %}</div>{% endif %}
-{% if restrictions %}<div class="card"><h2>Vigilance</h2>{% for r in restrictions %}<div id="vig-{{ loop.index }}" style="padding:6px 0">
+{% if restrictions %}<div class="card"><h2>Vigilance</h2>{% for r in restrictions %}<div id="vig-{{ loop.index }}" class="claim">
 <p>{{ r.populations|join(', ') }} — {{ r.kind }}{% if r.detail %} — {{ r.detail }}{% endif %}</p><p class="muted">Mention proposée : « {{ r.notice_text }} » · Source : {{ r.source_ref }}</p>
 {{ m.review('vigilance', s.code ~ '-' ~ r.notice, rv.get('vigilance:' ~ s.code ~ '-' ~ r.notice), csrf, here) }}</div>{% endfor %}</div>{% endif %}
-{% if risks %}<div class="card"><h2>Formulations à risque propres à cet ingrédient</h2>{% for e in risks %}<div id="{{ e.code }}" style="padding:6px 0">
+{% if risks %}<div class="card"><h2>Formulations à risque propres à cet ingrédient</h2>{% for e in risks %}<div id="{{ e.code }}" class="claim">
 <strong>« {{ e.lemma }} »</strong> <span class="tag red">{{ e.severity_product }}</span>{{ m.review('lexique', e.code, rv.get('lexique:' ~ e.code), csrf, here ~ '#' ~ e.code) }}</div>{% endfor %}</div>{% endif %}
 {% endblock %}""",
 
-"lexicon": """{% import "macros" as m %}{% extends "base" %}{% block content %}<p><a href="/app/base">← Base réglementaire</a></p>
+"lexicon": """{% import "macros" as m %}{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>Lexique des formulations à risque ({{ rows|length }})</h1><p class="muted">Gravité : fiche produit / article avec lien produit / article sans lien.</p></div>
 {% for e in rows %}<div class="card" id="{{ e.code }}"><strong>{{ e.lemma }}</strong> <span class="muted">({{ e.code }} · {{ e.category_label }}{% if e.icd10_code %} · CIM-10 {{ e.icd10_code }}{% endif %})</span>
 <p>Formes : {{ e.surface_forms|join(', ') }}{% if e.pattern_regex %} <span class="muted">+ motif</span>{% endif %}</p>
 <p><span class="tag red">{{ e.severity_product }}</span> / {{ e.severity_article_with_bridge }} / {{ e.severity_article_without_bridge }} · {{ e.legal_label }} · confiance {{ e.confidence }}</p>
 {% if e.note %}<p class="muted">{{ e.note }}</p>{% endif %}{{ m.review('lexique', e.code, rv.get('lexique:' ~ e.code), csrf, '/app/base/lexique#' ~ e.code) }}</div>{% endfor %}{% endblock %}""",
 
-"notices": """{% import "macros" as m %}{% extends "base" %}{% block content %}<p><a href="/app/base">← Base réglementaire</a></p>
+"notices": """{% import "macros" as m %}{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>Mentions ({{ rows|length }})</h1></div>{% for n in rows %}<div class="card" id="{{ n.code }}"><strong>{{ n.code }}</strong> <span class="muted">confiance {{ n.confidence }}</span>
 <p>« {{ n.text_fr }} »</p><p class="muted">{{ n.source_ref }}</p>{{ m.review('mention', n.code, rv.get('mention:' ~ n.code), csrf, '/app/base/mentions#' ~ n.code) }}</div>{% endfor %}{% endblock %}""",
 
-"tasks": """{% import "macros" as m %}{% extends "base" %}{% block content %}<p><a href="/app/base">← Base réglementaire</a></p>
+"tasks": """{% import "macros" as m %}{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>Tâches de revue ({{ rows|length }})</h1><p class="muted">Ce qu'il faut vérifier avant de publier la base. Votre avis sur chaque tâche est enregistré.</p></div>
-<div class="card scroll"><table><tr><th>#</th><th>Élément</th><th>Confiance</th><th>Tâche et avis</th></tr>{% for t in rows %}
+<div class="card flush scroll"><table><tr><th>#</th><th>Élément</th><th>Confiance</th><th>Tâche et avis</th></tr>{% for t in rows %}
 <tr id="TACHE-{{ t.n }}"><td>{{ t.n }}</td><td>{{ t.target_table }}<div class="muted">{{ t.target_code }}</div></td><td>{{ t.confidence }}</td>
 <td>{{ t.task_fr }}{{ m.review('tache', 'TACHE-' ~ t.n, rv.get('tache:TACHE-' ~ t.n), csrf, '/app/base/taches#TACHE-' ~ t.n) }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 
 "reviews": """{% extends "base" %}{% block content %}<div class="card"><h1>Mes avis ({{ rows|length }})</h1>
-<p><a class="btn" href="/app/avis.csv">Exporter en CSV</a></p></div><div class="card scroll"><table><tr><th>Date</th><th>Élément</th><th>Décision</th><th>Commentaire</th></tr>
+<p><a class="btn" href="/app/avis.csv">Exporter en CSV</a></p></div><div class="card flush scroll"><table><tr><th>Date</th><th>Élément</th><th>Décision</th><th>Commentaire</th></tr>
 {% for r in rows %}<tr><td>{{ r.date }}</td><td>{{ r.target_type }}<div class="muted">{{ r.target_code }}</div></td><td>{{ r.label }}</td><td>{{ r.comment or '' }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 
 "admin": """{% extends "base" %}{% block content %}<div class="card"><h1>Administration</h1><p><a class="btn" href="/admin/avis.csv">Exporter tous les avis (CSV)</a> <a href="/admin/banc">Banc d'essai</a> · <a href="/app/base/sources">Base officielle : import et mise à jour</a></p></div>
 <div class="card"><h2>État du service</h2>
 <p>Base de données : {% if diag.db == 'postgresql' %}<span class="tag ok">PostgreSQL</span> {{ diag.db_host }}{% else %}<span class="tag red">SQLite locale</span> — comptes, analyses et avis sont <strong>effacés à chaque redéploiement</strong>. Cause : {{ diag.db_detail }}. Vérifiez la variable DATABASE_URL (chaîne Supabase « Session pooler »).{% endif %}</p>
 <p>IA : {% if diag.ai %}<span class="tag ok">clé présente</span> modèle {{ diag.model }}{% if diag.last_ai_error %} · dernière erreur : <span class="muted">{{ diag.last_ai_error }}</span>{% endif %}{% else %}<span class="tag orange">désactivée</span> (ANTHROPIC_API_KEY absente){% endif %}</p></div>
-<div class="card scroll"><table><tr><th>E-mail</th><th>Nom</th><th>Créé le</th><th>Fin d'essai</th><th>Analyses</th><th>Avis</th></tr>
+<div class="card flush scroll"><table><tr><th>E-mail</th><th>Nom</th><th>Créé le</th><th>Fin d'essai</th><th>Analyses</th><th>Avis</th></tr>
 {% for u in rows %}<tr><td>{{ u.email }}</td><td>{{ u.name }}</td><td>{{ u.created }}</td><td>{{ u.ends }}</td><td>{{ u.analyses }}</td><td>{{ u.reviews }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 }
 

@@ -55,42 +55,44 @@ STATUS = {"EN_ATTENTE": ("En attente", "info"), "EN_COURS": ("En cours", "orange
           "ERREUR": ("Erreur", "red")}
 
 m.T["audit_form"] = """{% extends "base" %}{% block content %}
-<div class="card"><h1>Audit de site</h1>
-<p class="muted">Analysez d'un coup plusieurs pages : une liste d'URL, un sitemap, ou des documents (fiches produit en .docx, PDF, HTML…). Chaque page reçoit une analyse complète ; un tableau de bord classe les pages par niveau de risque.</p>
-{% if error %}<p class="error">{{ error }}</p>{% endif %}
-<form method="post" action="/app/audit" enctype="multipart/form-data"><input type="hidden" name="csrf" value="{{ csrf }}">
-<label for="title">Nom de l'audit</label><input id="title" name="title" maxlength="200" style="width:100%" placeholder="Ex. Site marque X — novembre" value="{{ form.title or '' }}">
-<label for="urls">URL (une par ligne)</label><textarea id="urls" name="urls" style="min-height:120px" placeholder="https://www.exemple.fr/products/…">{{ form.urls or '' }}</textarea>
-<div class="row"><div style="flex:2;min-width:260px"><label for="sitemap">Sitemap</label><input id="sitemap" name="sitemap" type="url" style="width:100%" placeholder="https://www.exemple.fr/sitemap.xml" value="{{ form.sitemap or '' }}"></div>
-<div style="flex:1;min-width:160px"><label for="contains">Garder les URL contenant</label><input id="contains" name="contains" placeholder="/products/" value="{{ form.contains or '' }}"></div></div>
+<div class="page-head"><div><h1>Audit de site</h1><div class="sub">Analysez d'un coup plusieurs pages : une liste d'URL, un sitemap, ou des documents (fiches produit en .docx, PDF, HTML…). Chaque page reçoit une analyse complète ; un tableau de bord classe les pages par niveau de risque.</div></div></div>
+<div class="layout"><div>
+{% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+<form method="post" action="/app/audit" enctype="multipart/form-data" class="card"><input type="hidden" name="csrf" value="{{ csrf }}">
+<label for="title">Nom de l'audit</label><input class="w-full" id="title" name="title" maxlength="200" placeholder="Ex. Site marque X — novembre" value="{{ form.title or '' }}">
+<label for="urls">URL (une par ligne)</label><textarea id="urls" name="urls" rows="5" class="short" placeholder="https://www.exemple.fr/products/…">{{ form.urls or '' }}</textarea>
+<div class="row"><div class="grow"><label for="sitemap">Sitemap</label><input class="w-full" id="sitemap" name="sitemap" type="url" placeholder="https://www.exemple.fr/sitemap.xml" value="{{ form.sitemap or '' }}"></div>
+<div><label for="contains">Garder les URL contenant</label><input id="contains" name="contains" placeholder="/products/" value="{{ form.contains or '' }}"></div></div>
 <label for="files">Fichiers (.docx, .pdf, .html, .txt, .md ; ou .txt / .csv contenant des URL)</label><input id="files" name="files" type="file" multiple accept=".docx,.pdf,.html,.htm,.txt,.md,.csv">
-<div class="row"><div><label for="max">Nombre maximal de pages</label><input id="max" name="max" inputmode="numeric" size="5" value="{{ form.max or 50 }}"> <span class="muted">(jusqu'à {{ cap }})</span></div>
+<div class="row"><div><label for="max">Nombre maximal de pages</label><input id="max" name="max" inputmode="numeric" size="5" value="{{ form.max or 50 }}"><div class="hint">jusqu'à {{ cap }}</div></div>
 <div><label for="mode">Type de pages</label><select id="mode" name="mode"><option value="AUTO">Détection automatique</option><option value="PRODUCT_PAGE">Fiches produit</option><option value="EDITORIAL_BLOG">Articles de blog</option></select></div></div>
-{% if ai_enabled %}<label style="font-weight:400"><input type="checkbox" name="use_ai" value="1" checked> Inclure l'extraction IA des promesses implicites (plus précis, plus lent{% if not acc.admin %}, compte dans la limite de {{ ai_limit }} analyses IA par jour{% endif %})</label>{% endif %}
-<p><button>Lancer l'audit</button></p></form></div>
-{% if audits %}<div class="card scroll"><h2>Mes audits</h2><table><tr><th>Audit</th><th>Date</th><th>Pages</th><th>Statut</th></tr>
-{% for a in audits %}<tr><td><a href="/app/audits/{{ a.id }}">{{ a.title }}</a></td><td>{{ a.date }}</td><td>{{ a.done }} / {{ a.total }}</td><td>{{ a.status }}</td></tr>{% endfor %}</table></div>{% endif %}
+{% if ai_enabled %}<label class="inline"><input type="checkbox" name="use_ai" value="1" checked> Inclure l'extraction IA des promesses implicites (plus précis, plus lent{% if not acc.admin %}, compte dans la limite de {{ ai_limit }} analyses IA par jour{% endif %})</label>{% endif %}
+<div class="actions form-foot"><button>Lancer l'audit</button></div></form></div>
+<aside class="stack"><div class="card"><h3>Mes audits</h3>{% if audits %}<ul class="list-plain small">{% for a in audits %}<li><a href="/app/audits/{{ a.id }}">{{ a.title }}</a>
+<div class="faint xs">{{ a.date }} · {{ a.done }} / {{ a.total }} · {{ a.status }}</div></li>{% endfor %}</ul>{% else %}<p class="muted small">Aucun audit pour l'instant.</p>{% endif %}</div></aside></div>
 {% endblock %}"""
 
 m.T["audit"] = """{% extends "base" %}{% block content %}
-<p><a href="/app/audit">← Audits</a></p>
-<div class="card"><h1>{{ a.title }}</h1><p class="muted">Créé le {{ a.date }} · {{ 'avec' if a.use_ai else 'sans' }} extraction IA</p>
-<div style="background:var(--line);border-radius:6px;height:10px;overflow:hidden"><div style="background:var(--accent);height:10px;width:{{ pct }}%"></div></div>
-<p>{{ done }} / {{ total }} page(s) traitée(s){% if errors %}, dont {{ errors }} en erreur{% endif %}.{% if running %} Analyse en cours : la page se met à jour toute seule.{% endif %}</p>
+<nav class="crumb" aria-label="Fil d'Ariane"><a href="/app/audit">← Audits</a></nav>
+<section class="card"><div class="page-head"><div><h1>{{ a.title }}</h1><div class="sub">Créé le {{ a.date }} · {{ 'avec' if a.use_ai else 'sans' }} extraction IA</div></div>
+<div class="actions"><a class="btn secondary" href="/app/audits/{{ a.id }}.csv">Exporter en CSV</a></div></div>
+<div class="progress" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><span class="w-{{ (pct // 5) * 5 }}"></span></div>
+<p class="small muted">{{ done }} / {{ total }} page(s) traitée(s){% if errors %}, dont {{ errors }} en erreur{% endif %}.{% if running %} Analyse en cours : la page se met à jour toute seule.{% endif %}</p>
 {% if running %}<meta http-equiv="refresh" content="10">{% endif %}
-<div class="grid"><div><span class="tag red">Pages avec points prioritaires</span><div class="count">{{ pages_red }}</div></div>
-<div><span class="tag red">À revoir en priorité</span><div class="count">{{ sum_red }}</div></div>
-<div><span class="tag orange">À revoir</span><div class="count">{{ sum_orange }}</div></div>
-<div><span class="tag cond">À confirmer</span><div class="count">{{ sum_cond }}</div></div></div>
-<p><a class="btn" href="/app/audits/{{ a.id }}.csv">Exporter en CSV</a></p></div>
-{% if top_terms %}<div class="card"><h2>Formulations prioritaires les plus fréquentes</h2><p>{% for t, n in top_terms %}<span class="tag red" style="margin:2px">{{ t }} ×{{ n }}</span> {% endfor %}</p></div>{% endif %}
-{% if rejected %}<div class="card"><h2>Ingrédients sans allégation de santé autorisée</h2><p>{% for t, n in rejected %}<span class="tag red" style="margin:2px">{{ t }} — {{ n }} page(s)</span> {% endfor %}</p></div>{% endif %}
-<div class="card scroll"><h2>Pages, de la plus à la moins risquée</h2><table><tr><th>Page</th><th>Rouge</th><th>Orange</th><th>À confirmer</th><th>À traiter en premier</th><th>Statut</th></tr>
+<div class="kpis"><div class="kpi {{ 'red' if pages_red }}"><span class="tag red">Pages avec points prioritaires</span><div class="count">{{ pages_red }}</div></div>
+<div class="kpi"><span class="tag red">À revoir en priorité</span><div class="count">{{ sum_red }}</div></div>
+<div class="kpi"><span class="tag orange">À revoir</span><div class="count">{{ sum_orange }}</div></div>
+<div class="kpi"><span class="tag cond">À confirmer</span><div class="count">{{ sum_cond }}</div></div></div></section>
+<div class="grid">
+{% if top_terms %}<section class="card"><h2>Formulations prioritaires les plus fréquentes</h2><div class="actions">{% for t, n in top_terms %}<span class="tag red">{{ t }} ×{{ n }}</span>{% endfor %}</div></section>{% endif %}
+{% if rejected %}<section class="card"><h2>Ingrédients sans allégation de santé autorisée</h2><div class="actions">{% for t, n in rejected %}<span class="tag red">{{ t }} — {{ n }} page(s)</span>{% endfor %}</div></section>{% endif %}
+</div>
+<section class="card flush"><div class="card-head pad"><h2>Pages, de la plus à la moins risquée</h2></div><div class="scroll"><table><tr><th>Page</th><th class="num">Rouge</th><th class="num">Orange</th><th class="num">À confirmer</th><th>À traiter en premier</th><th>Statut</th></tr>
 {% for it in items %}<tr><td>{% if it.analysis_id %}<a href="/app/analyses/{{ it.analysis_id }}">{{ it.title or it.source }}</a>{% else %}{{ it.title or it.source }}{% endif %}
-<div class="muted" style="word-break:break-all;font-size:13px">{{ it.source }}</div></td>
-<td>{{ it.red if it.red is not none else '' }}</td><td>{{ it.orange if it.orange is not none else '' }}</td><td>{{ it.cond if it.cond is not none else '' }}</td>
-<td class="muted" style="font-size:14px">{{ it.first|join(' · ') }}{% if it.error %}<span style="color:var(--red)">{{ it.error }}</span>{% endif %}</td>
-<td><span class="tag {{ it.st[1] }}">{{ it.st[0] }}</span></td></tr>{% endfor %}</table></div>
+<div class="faint xs break">{{ it.source }}</div></td>
+<td class="num">{{ it.red if it.red is not none else '' }}</td><td class="num">{{ it.orange if it.orange is not none else '' }}</td><td class="num">{{ it.cond if it.cond is not none else '' }}</td>
+<td class="muted small">{{ it.first|join(' · ') }}{% if it.error %}<span class="red">{{ it.error }}</span>{% endif %}</td>
+<td><span class="tag {{ it.st[1] }}">{{ it.st[0] }}</span></td></tr>{% endfor %}</table></div></section>
 {% endblock %}"""
 
 

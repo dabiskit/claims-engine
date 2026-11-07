@@ -302,7 +302,7 @@ def bench_start(request: Request, csrf_token: str = Form("", alias="csrf")):
 # Gabarits
 # -----------------------------------------------------------------------------
 m.T["proposals"] = """{% extends "base" %}{% block content %}
-<p><a href="/app/analyses/{{ aid }}">← Résultat de l'analyse</a></p>
+<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/analyses/{{ aid }}">← Résultat de l'analyse</a></nav>
 <div class="card"><h1>Propositions de réécriture</h1>
 {% if job == 'EN_COURS' %}<p><strong>Réécriture en cours…</strong> Cette page se met à jour toute seule.</p><meta http-equiv="refresh" content="6">{% elif job and job.startswith('ERREUR') %}<p class="error">{{ job }}</p>{% endif %}
 {% if flash %}<p class="error">{{ flash }}</p>{% endif %}
@@ -318,16 +318,16 @@ m.T["proposals"] = """{% extends "base" %}{% block content %}
 {% if p.after_html %}<details><summary>HTML du bloc, prêt à copier dans votre CMS</summary><textarea readonly rows="4">{{ p.after_html }}</textarea></details>{% endif %}
 {% if p.decision %}<p><span class="tag ok">{{ p.decision.label }}</span> par {{ p.decision.email }} le {{ p.decision.date }}{% if p.decision.reason %} — motif : « {{ p.decision.reason }} »{% endif %}</p>
 {% if p.decision.decision == 'MODIFIEE' %}<p><strong>Version retenue :</strong> {{ p.decision.final_text }}</p>{% endif %}{% endif %}
-<form method="post" action="/app/propositions/{{ p.id }}/decision" class="review" style="flex-direction:column;align-items:stretch"><input type="hidden" name="csrf" value="{{ csrf }}">
+<form method="post" action="/app/propositions/{{ p.id }}/decision" class="decision"><input type="hidden" name="csrf" value="{{ csrf }}">
 <div class="row"><select name="decision">{% if p.after_text %}<option value="ACCEPTEE">Accepter la proposition</option>{% endif %}<option value="MODIFIEE">Enregistrer ma version (ci-dessous, vérifiée avant enregistrement)</option><option value="MAINTENUE">Maintenir le texte d'origine sous ma responsabilité</option></select>
-<input name="reason" placeholder="Motif (obligatoire pour « maintenir »)" style="flex:1"></div>
-<textarea name="final_text" rows="3" style="min-height:70px">{{ p.after_text or p.before_text }}</textarea>
+<input class="grow" name="reason" placeholder="Motif (obligatoire pour « maintenir »)"></div>
+<textarea name="final_text" rows="3" class="short">{{ p.after_text or p.before_text }}</textarea>
 <div><button>Enregistrer la décision</button></div></form></div>{% endfor %}
 {% endblock %}"""
 
 m.T["report"] = """{% extends "base" %}{% block content %}
 <style>@media print{header,.banner,.trial,.noprint{display:none!important}main{max-width:none;padding:0}.card{break-inside:avoid;border:1px solid #999}}</style>
-<p class="noprint"><a href="/app/analyses/{{ aid }}">← Résultat</a> · <button onclick="window.print()">Imprimer / enregistrer en PDF</button></p>
+<div class="actions noprint crumb"><a href="/app/analyses/{{ aid }}">← Résultat</a><button class="secondary sm" onclick="window.print()">Imprimer / enregistrer en PDF</button></div>
 <div class="card"><h1>Rapport de pré-analyse des allégations</h1>
 <p>{{ r.source }} · {{ 'Fiche produit' if r.mode == 'PRODUCT_PAGE' else 'Article de blog' }}{% if r.product_name %} · {{ r.product_name }}{% endif %}</p>
 <p class="muted">Analyse du {{ r.created }} · rapport généré le {{ generated }} par {{ user_email }} · base réglementaire {{ r.kb_release }} (brouillon){% if r.models %} · modèles : {{ r.models|join(', ') }}{% endif %}</p>
@@ -338,7 +338,7 @@ m.T["report"] = """{% extends "base" %}{% block content %}
 {% for f in r.page_level %}<p><span class="tag {{ f.css }}">{{ f.level_label }}</span> {{ f.explanation }}</p>{% endfor %}
 {% if not r.nodes and not r.page_level %}<p>Aucun passage relevé par la pré-analyse automatique. Cela ne vaut pas validation.</p>{% endif %}</div>
 <div class="card"><h2>Décisions</h2>{% if not rows %}<p class="muted">Aucune proposition de réécriture.</p>{% endif %}
-{% for p in rows %}<div style="border-top:1px solid var(--line);padding:8px 0"><p class="muted">{{ p.placement }}</p>
+{% for p in rows %}<div class="claim"><p class="muted">{{ p.placement }}</p>
 <p><strong>Avant :</strong> {{ p.before_text }}</p>{% if p.after_text %}<p><strong>Proposition :</strong> {{ p.after_text }}</p>{% endif %}
 {% if p.decision %}<p><strong>Décision :</strong> {{ p.decision.label }} — {{ p.decision.email }}, {{ p.decision.date }}{% if p.decision.reason %} — motif : {{ p.decision.reason }}{% endif %}</p>
 {% if p.decision.decision == 'MODIFIEE' %}<p><strong>Version retenue :</strong> {{ p.decision.final_text }}</p>{% endif %}{% else %}<p><em>Sans décision.</em></p>{% endif %}
@@ -348,7 +348,7 @@ m.T["report"] = """{% extends "base" %}{% block content %}
 
 m.T["pricing"] = """{% extends "base" %}{% block content %}<div class="card"><h1>Tarifs</h1><p>Essai gratuit avec toutes les fonctionnalités pendant {{ trial_days }} jours, sans carte bancaire. Audit flash gratuit de 3 URLs ; audit catalogue à 490 € HT (jusqu'à 50 pages), offert avec un engagement annuel.</p>
 {% if not user %}<p><a class="btn" href="/essai">Démarrer l'essai gratuit</a></p>{% endif %}</div>
-<div class="grid">{% for name, price, items in plans %}<div class="card"><h3>{{ name }}</h3><p><strong>{{ price }}</strong></p><ul>{% for i in items %}<li>{{ i }}</li>{% endfor %}</ul></div>{% endfor %}</div>
+<div class="grid plans">{% for name, price, items in plans %}<div class="card"><h3>{{ name }}</h3><p class="price">{{ price }}</p><ul>{% for i in items %}<li>{{ i }}</li>{% endfor %}</ul></div>{% endfor %}</div>
 <p class="muted">Facturation en ligne à venir : pendant la période de lancement, les abonnements sont ouverts sur devis.</p>{% endblock %}"""
 
 m.T["bench"] = """{% extends "base" %}{% block content %}<div class="card"><h1>Banc d'essai</h1>

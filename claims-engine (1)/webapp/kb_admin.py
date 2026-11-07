@@ -26,13 +26,13 @@ from webapp import main as m
 SYNC_DAYS = int(os.environ.get("KB_SYNC_DAYS", "7"))
 _lock = threading.Lock()
 
-m.T["sources"] = """{% extends "base" %}{% block content %}<p><a href="/app/base">← Base réglementaire</a></p>
+m.T["sources"] = """{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>Sources officielles et mise à jour</h1>
 <p>La base combine la <strong>base rédigée</strong> (lexique des formulations à risque, variantes, vigilance : en cours de validation par l'expert)
 et un <strong>import automatique des textes officiels</strong> : libellés et conditions d'utilisation des allégations autorisées, et liste des demandes refusées.
 Chaque allégation importée cite sa source et la version du texte.</p>
 {% if official %}<table><tr><th>Source</th><th>Version</th><th>Éléments</th></tr>{% for src in official.sources %}
-<tr><td><a href="{{ src.url }}" rel="noopener" target="_blank">{{ src.name }}</a>{% if src.api %}<div class="muted" style="word-break:break-all">API : {{ src.api }}</div>{% endif %}</td><td>{{ src.version or '—' }}</td>
+<tr><td><a href="{{ src.url }}" rel="noopener" target="_blank">{{ src.name }}</a>{% if src.api %}<div class="faint xs break">API : {{ src.api }}</div>{% endif %}</td><td>{{ src.version or '—' }}</td>
 <td>{{ src.items }}{% if src.authorised is defined %} <span class="muted">({{ src.authorised }} autorisées, {{ src.rejected }} refusées)</span>{% endif %}</td></tr>{% endfor %}</table>
 <p class="muted">Téléchargé le {{ official.retrieved_at[:16]|replace('T', ' à ') }} UTC. Ajouts à la base : {{ official.stats.new_claims }} allégations, {{ official.stats.new_substances }} ingrédients
 ({{ official.stats.already_in_base }} libellés déjà présents dans la base rédigée, conservés tels quels).</p>
@@ -45,12 +45,12 @@ les doses maximales recommandées par la DGCCRF. L'interprétation (rattacher un
 {% for h in history %}<tr><td>{{ h.started }}</td><td>{{ h.finished }}</td><td><span class="tag {{ {'OK':'ok','ERREUR':'red','EN_COURS':'orange'}.get(h.status, 'info') }}">{{ h.status }}</span></td><td class="muted">{{ h.message }}</td></tr>{% endfor %}</table></div>{% endif %}
 {% endblock %}"""
 
-m.T["rejected"] = """{% extends "base" %}{% block content %}<p><a href="/app/base">← Base réglementaire</a></p>
+m.T["rejected"] = """{% extends "base" %}{% block content %}<nav class="crumb" aria-label="Fil d\'Ariane"><a href="/app/base">← Base réglementaire</a></nav>
 <div class="card"><h1>Demandes d'allégation refusées ({{ total }})</h1>
 <p class="muted">Registre de l'Union (Commission européenne), texte officiel en anglais. Une allégation refusée ne peut pas être utilisée, ni telle quelle ni reformulée.</p>
-<form method="get" class="row"><input name="q" value="{{ q }}" placeholder="Ingrédient ou mot de l'allégation (en anglais : collagen, skin, joint…)" style="flex:1;min-width:240px"><button>Rechercher</button></form>
+<form method="get" class="row"><input class="grow" name="q" value="{{ q }}" placeholder="Ingrédient ou mot de l'allégation (en anglais : collagen, skin, joint…)"><button>Rechercher</button></form>
 <p class="muted">{{ n }} résultat(s){% if n > rows|length %}, {{ rows|length }} affichés{% endif %}.</p></div>
-<div class="card scroll"><table><tr><th>Ingrédient</th><th>Allégation demandée</th><th>Type</th><th>Référence</th></tr>
+<div class="card flush scroll"><table><tr><th>Ingrédient</th><th>Allégation demandée</th><th>Type</th><th>Référence</th></tr>
 {% for r in rows %}<tr><td>{{ r.substance_en }}</td><td>{{ r.claim_en }}</td><td>{{ r.type }}<div class="muted">{{ r.status }}</div></td><td class="muted">{{ r.id }}{% if r.efsa_question %}<div>{{ r.efsa_question }}</div>{% endif %}</td></tr>{% endfor %}</table></div>{% endblock %}"""
 
 
