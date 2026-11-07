@@ -113,3 +113,20 @@ def test_sources_and_rejected_pages():
         assert c.get("/app/base/VITAMINE_A").status_code == 200
     finally:
         main.apply_seed(main.BASE_SEED)
+
+
+def test_dose_of_portion_is_not_attributed_to_a_listed_ingredient():
+    from engine.page_scope import detect_composition
+    al = {"VIT_C": ["vitamine C", "acide ascorbique"], "MG": ["magnésium"]}
+    lab = {"VIT_C": "Vitamine C", "MG": "Magnésium"}
+    assert detect_composition(["Ingrédients : collagène marin 6 g, arôme framboise, acide ascorbique"], al, lab) == []
+    got = detect_composition(["Chaque dose apporte 60 mg de vitamine C.", "Magnésium (bisglycinate) 300 mg"], al, lab)
+    assert sorted((d.substance, d.amount) for d in got) == [("MG", 300.0), ("VIT_C", 60.0)]
+
+
+def test_negated_disclaimer_is_not_a_therapeutic_claim():
+    from engine.mode_router import lexical_hits
+    t = "Ce produit n'est pas destiné à diagnostiquer, traiter, soigner ou prévenir une quelconque maladie."
+    assert lexical_hits(main.KB.lexicon, t) == []
+    assert [t2 for t2 in ("prévenir",) if any("prévenir" == "Ce collagène aide à prévenir l'arthrose."[h.start:h.end]
+            for h in lexical_hits(main.KB.lexicon, "Ce collagène aide à prévenir l'arthrose."))] == ["prévenir"]
