@@ -1,0 +1,25 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["claims"],
+  "properties": {
+    "claims": {
+      "type": "array",
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["node_key", "quote", "claim_type", "substance_code", "matched_claim_code", "wording_faithful", "rationale"],
+        "properties": {
+          "node_key": {"type": "string"},
+          "quote": {"type": "string", "minLength": 2, "maxLength": 300},
+          "claim_type": {"enum": ["PROPRIETE_THERAPEUTIQUE_INTERDITE", "REDUCTION_RISQUE_MALADIE", "SANTE_FONCTIONNELLE", "NUTRITIONNELLE", "REFERENCE_GENERALE_ART10_3"]},
+          "substance_code": {"type": ["string", "null"]},
+          "matched_claim_code": {"type": "string"},
+          "wording_faithful": {"type": "boolean"},
+          "rationale": {"type": "string", "maxLength": 400}
+        }
+      }
+    }
+  }
+}

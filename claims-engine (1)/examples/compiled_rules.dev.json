@@ -1,0 +1,696 @@
+{
+    "lexicon": [
+        {
+            "code": "LEX-ANXIETE",
+            "forms": [
+                "anxiete",
+                "anxietes"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "PATHOLOGIE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-ARTHROSE",
+            "forms": [
+                "arthrose",
+                "arthroses"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "PATHOLOGIE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-BRULE-GRAISSE",
+            "forms": [
+                "brule-graisse",
+                "brule-graisses",
+                "brule graisse",
+                "fat burner"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "DOCTRINAL_RISQUE",
+            "severity": {
+                "PRODUIT": "ORANGE",
+                "ARTICLE_AVEC_PONT": "ORANGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "DOCTRINE_ADMINISTRATIVE",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-BURNOUT",
+            "forms": [
+                "burn-out",
+                "burnout",
+                "burn out"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "PATHOLOGIE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-ATTRIBUTS",
+            "forms": [
+                "bio",
+                "biologique",
+                "naturel",
+                "naturelle",
+                "naturels",
+                "naturelles",
+                "vegan",
+                "vegetalien",
+                "fabrique en france",
+                "made in france",
+                "brevete",
+                "brevetee",
+                "cliniquement",
+                "prouve",
+                "prouvee",
+                "teste",
+                "testee",
+                "scientifiquement",
+                "laboratoire"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "ATTRIBUT_FACTUEL",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-FATIGUE",
+            "forms": [
+                "fatigue",
+                "energie",
+                "vitalite"
+            ],
+            "topic": "fatigue",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-NERVEUX",
+            "forms": [
+                "systeme nerveux",
+                "nerveux",
+                "nerveuse"
+            ],
+            "topic": "systeme_nerveux",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-PSY",
+            "forms": [
+                "psychologique",
+                "psychologiques",
+                "moral",
+                "mental",
+                "mentale"
+            ],
+            "topic": "psychologique",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-RELAX",
+            "forms": [
+                "relaxation",
+                "detente",
+                "serenite"
+            ],
+            "topic": "relaxation",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-SOMMEIL",
+            "forms": [
+                "sommeil",
+                "endormissement",
+                "endormir",
+                "nuit",
+                "nuits"
+            ],
+            "topic": "sommeil",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-THEME-STRESS",
+            "forms": [
+                "stress",
+                "stresse",
+                "stressee",
+                "anti-stress"
+            ],
+            "topic": "stress",
+            "pattern": null,
+            "category": "THEME_PHYSIOLOGIQUE",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-CTRL-VERBES-EFFET",
+            "forms": [
+                "contribue",
+                "contribuent",
+                "contribuer",
+                "aide",
+                "aident",
+                "aider",
+                "favorise",
+                "favorisent",
+                "favoriser",
+                "soutient",
+                "soutiennent",
+                "soutenir",
+                "reduit",
+                "reduisent",
+                "reduire",
+                "ameliore",
+                "ameliorent",
+                "ameliorer",
+                "booste",
+                "boostent",
+                "booster",
+                "apaise",
+                "apaisent",
+                "apaiser",
+                "calme",
+                "calment",
+                "calmer",
+                "renforce",
+                "renforcent",
+                "renforcer",
+                "optimise",
+                "optimisent",
+                "optimiser",
+                "stimule",
+                "stimulent",
+                "stimuler",
+                "maintient",
+                "maintenir",
+                "preserve",
+                "preserver",
+                "protege",
+                "protegent",
+                "proteger",
+                "lutte",
+                "lutter",
+                "combat",
+                "combattre",
+                "diminue",
+                "diminuer",
+                "augmente",
+                "augmenter",
+                "retrouver",
+                "retrouvez",
+                "regenere",
+                "regenerer",
+                "draine",
+                "drainer",
+                "brule",
+                "bruler",
+                "participe",
+                "participent",
+                "participer"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VERBE_EFFET",
+            "severity": {
+                "PRODUIT": "NEUTRE",
+                "ARTICLE_AVEC_PONT": "NEUTRE",
+                "ARTICLE_SANS_PONT": "NEUTRE"
+            },
+            "legal_basis": "REGLE_INTERNE_MOTEUR",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-DES-PREMIERE",
+            "forms": [
+                "des la premiere nuit"
+            ],
+            "topic": null,
+            "pattern": "des\\s+(?:la\\s+)?premiere\\s+(?:nuit|prise|semaine|utilisation)",
+            "category": "SUPERLATIF_PROMESSE",
+            "severity": {
+                "PRODUIT": "ORANGE",
+                "ARTICLE_AVEC_PONT": "ORANGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "CCONSO_PRATIQUE_TROMPEUSE",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-DETOX",
+            "forms": [
+                "detox",
+                "detoxifiant",
+                "detoxifiante",
+                "detoxification"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "DOCTRINAL_RISQUE",
+            "severity": {
+                "PRODUIT": "ORANGE",
+                "ARTICLE_AVEC_PONT": "ORANGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "DOCTRINE_ADMINISTRATIVE",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-GUERIR",
+            "forms": [
+                "guerit",
+                "guerissent",
+                "guerir",
+                "gueri",
+                "guerie",
+                "gueris",
+                "guerison"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VERBE_THERAPEUTIQUE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-INSOMNIE",
+            "forms": [
+                "insomnie",
+                "insomnies"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "PATHOLOGIE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-PERTE-POIDS-CHIFFREE",
+            "forms": [
+                "perdez"
+            ],
+            "topic": null,
+            "pattern": "perd[a-z]*\\s+(?:jusqu'a\\s+)?\\d+(?:[.,]\\d+)?\\s*(?:kg|kilos?)",
+            "category": "ART12_PERTE_DE_POIDS",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "R1924_2006_ART12_B",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-POSOLOGIE",
+            "forms": [
+                "posologie",
+                "posologies"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VOCABULAIRE_PHARMACEUTIQUE",
+            "severity": {
+                "PRODUIT": "ORANGE",
+                "ARTICLE_AVEC_PONT": "ORANGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "CSP_L5111_1_PRESENTATION",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-RECO-MEDECINS",
+            "forms": [
+                "recommande par les medecins"
+            ],
+            "topic": null,
+            "pattern": "(?:recommande|conseille|prescrit|approuve)e?s?\\s+par\\s+(?:les\\s+|des\\s+|un\\s+)?(?:medecins?|pharmaciens?|docteurs?)",
+            "category": "ART12_PROFESSIONNEL_SANTE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "R1924_2006_ART12_C",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-REPARATEUR",
+            "forms": [
+                "reparateur",
+                "reparatrice",
+                "reparateurs",
+                "reparatrices"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "DOCTRINAL_RISQUE",
+            "severity": {
+                "PRODUIT": "ORANGE",
+                "ARTICLE_AVEC_PONT": "ORANGE",
+                "ARTICLE_SANS_PONT": "INFO"
+            },
+            "legal_basis": "DOCTRINE_ADMINISTRATIVE",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-SOIGNER",
+            "forms": [
+                "soigne",
+                "soignent",
+                "soigner",
+                "soignez",
+                "soignera",
+                "soignant"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VERBE_THERAPEUTIQUE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-SOULAGER",
+            "forms": [
+                "soulage",
+                "soulagent",
+                "soulager",
+                "soulagement"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VERBE_THERAPEUTIQUE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+            ]
+        },
+        {
+            "code": "LEX-TRAITEMENT",
+            "forms": [
+                "traitement",
+                "traitements",
+                "traite",
+                "traiter"
+            ],
+            "topic": null,
+            "pattern": null,
+            "category": "VERBE_THERAPEUTIQUE",
+            "severity": {
+                "PRODUIT": "ROUGE",
+                "ARTICLE_AVEC_PONT": "ROUGE",
+                "ARTICLE_SANS_PONT": "ORANGE"
+            },
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "neutralizers": [
+                "ne remplace pas un",
+                "ne se substitue pas a un",
+                "en cas de"
+            ]
+        }
+    ],
+    "release": 1,
+    "variants": [
+        {
+            "code": "AUT-B6-FATIGUE-V00",
+            "norm": "la vitamine b6 contribue a reduire la fatigue",
+            "claim": "AUT-B6-FATIGUE"
+        },
+        {
+            "code": "AUT-B6-FATIGUE-V01",
+            "norm": "la vitamine b6, qui contribue a reduire la fatigue",
+            "claim": "AUT-B6-FATIGUE"
+        },
+        {
+            "code": "AUT-B6-FATIGUE-V02",
+            "norm": "de la vitamine b6, qui contribue a reduire la fatigue",
+            "claim": "AUT-B6-FATIGUE"
+        },
+        {
+            "code": "AUT-B6-PSY-V00",
+            "norm": "la vitamine b6 contribue a des fonctions psychologiques normales",
+            "claim": "AUT-B6-PSY"
+        },
+        {
+            "code": "AUT-B6-SYSNERV-V00",
+            "norm": "la vitamine b6 contribue au fonctionnement normal du systeme nerveux",
+            "claim": "AUT-B6-SYSNERV"
+        },
+        {
+            "code": "AUT-B6-SYSNERV-V01",
+            "norm": "la vitamine b6, qui contribue au fonctionnement normal du systeme nerveux",
+            "claim": "AUT-B6-SYSNERV"
+        },
+        {
+            "code": "AUT-MELA-ENDORM-V00",
+            "norm": "la melatonine contribue a reduire le temps d'endormissement",
+            "claim": "AUT-MELA-ENDORM"
+        },
+        {
+            "code": "AUT-MG-FATIGUE-V00",
+            "norm": "le magnesium contribue a reduire la fatigue",
+            "claim": "AUT-MG-FATIGUE"
+        },
+        {
+            "code": "AUT-MG-FATIGUE-V01",
+            "norm": "le magnesium, qui contribue a reduire la fatigue",
+            "claim": "AUT-MG-FATIGUE"
+        },
+        {
+            "code": "AUT-MG-FATIGUE-V02",
+            "norm": "du magnesium, qui contribue a reduire la fatigue",
+            "claim": "AUT-MG-FATIGUE"
+        },
+        {
+            "code": "AUT-MG-MUSCLE-V00",
+            "norm": "le magnesium contribue a une fonction musculaire normale",
+            "claim": "AUT-MG-MUSCLE"
+        },
+        {
+            "code": "AUT-MG-PSY-V00",
+            "norm": "le magnesium contribue a des fonctions psychologiques normales",
+            "claim": "AUT-MG-PSY"
+        },
+        {
+            "code": "AUT-MG-PSY-V01",
+            "norm": "le magnesium, qui contribue a des fonctions psychologiques normales",
+            "claim": "AUT-MG-PSY"
+        },
+        {
+            "code": "AUT-MG-PSY-V02",
+            "norm": "du magnesium, qui contribue a des fonctions psychologiques normales",
+            "claim": "AUT-MG-PSY"
+        },
+        {
+            "code": "AUT-MG-PSY-V03",
+            "norm": "le magnesium participe a des fonctions psychologiques normales",
+            "claim": "AUT-MG-PSY"
+        },
+        {
+            "code": "AUT-MG-SYSNERV-V00",
+            "norm": "le magnesium contribue au fonctionnement normal du systeme nerveux",
+            "claim": "AUT-MG-SYSNERV"
+        },
+        {
+            "code": "FIXTURE-OH-WS-RELAX-V00",
+            "norm": "l'ashwagandha contribue a la relaxation",
+            "claim": "FIXTURE-OH-WS-RELAX"
+        },
+        {
+            "code": "FIXTURE-OH-WS-RELAX-V01",
+            "norm": "de l'ashwagandha, qui contribue a la relaxation",
+            "claim": "FIXTURE-OH-WS-RELAX"
+        }
+    ],
+    "substance_aliases": [
+        {
+            "norm": "melatonine",
+            "ambiguous": false,
+            "substance": "MELATONINE"
+        },
+        {
+            "norm": "bisglycinate de magnesium",
+            "ambiguous": false,
+            "substance": "MG"
+        },
+        {
+            "norm": "citrate de magnesium",
+            "ambiguous": false,
+            "substance": "MG"
+        },
+        {
+            "norm": "magnesium",
+            "ambiguous": false,
+            "substance": "MG"
+        },
+        {
+            "norm": "magnesium marin",
+            "ambiguous": false,
+            "substance": "MG"
+        },
+        {
+            "norm": "oxyde de magnesium",
+            "ambiguous": false,
+            "substance": "MG"
+        },
+        {
+            "norm": "b6",
+            "ambiguous": false,
+            "substance": "VIT_B6"
+        },
+        {
+            "norm": "pyridoxal-5-phosphate",
+            "ambiguous": false,
+            "substance": "VIT_B6"
+        },
+        {
+            "norm": "pyridoxine",
+            "ambiguous": false,
+            "substance": "VIT_B6"
+        },
+        {
+            "norm": "vitamine b6",
+            "ambiguous": false,
+            "substance": "VIT_B6"
+        },
+        {
+            "norm": "ashwagandha",
+            "ambiguous": false,
+            "substance": "WITHANIA_SOMNIFERA"
+        },
+        {
+            "norm": "ginseng indien",
+            "ambiguous": false,
+            "substance": "WITHANIA_SOMNIFERA"
+        },
+        {
+            "norm": "ksm-66",
+            "ambiguous": false,
+            "substance": "WITHANIA_SOMNIFERA"
+        },
+        {
+            "norm": "withania",
+            "ambiguous": false,
+            "substance": "WITHANIA_SOMNIFERA"
+        },
+        {
+            "norm": "withania somnifera",
+            "ambiguous": false,
+            "substance": "WITHANIA_SOMNIFERA"
+        }
+    ]
+}

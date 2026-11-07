@@ -1,0 +1,681 @@
+{
+  "meta": {
+    "timestamp": "2026-10-24T13:12:13+00:00",
+    "mode": "replay",
+    "pipeline": "deterministe+replay",
+    "kb_release": "KB-PROD-0.1-LOT1",
+    "git_commit": null,
+    "golden_sha256": "67bd7abe9a67099b6aefea20bcaf0ef3a4a82f0eab88a01fc7bd0ba35037b02f",
+    "kb_sha256": "434e36cd561d5304079d2862b3accad580642ee8f159052f39e9726dbd2f8788",
+    "replays_sha256": "0f5e2e0645247548aa5bfea64f4accf947e65a89bfbacfdf336a77cddaecbf1b",
+    "engine_fingerprint": "15761073a9cd2d55173cb769cc1ec213014ff45703aaa44680e3efcb8a316601",
+    "prompts_fingerprint": null,
+    "cases": 10,
+    "golden_expert_validated": false
+  },
+  "self_test": null,
+  "metrics": {
+    "critical_recall": 0.6666666666666666,
+    "precision": 1.0,
+    "false_red_on_true_negatives": 0,
+    "orange_recall": 0.8181818181818182,
+    "frozen_zone_integrity": 1.0,
+    "dom_skeleton_preservation": 1.0,
+    "zero_residual_red": 0.9,
+    "rewrite_constraints": 0.9,
+    "seo_bridge_hit_rate": 1.0,
+    "avg_cost_eur_per_page": null,
+    "recall_by_stage": {
+      "EXTRACTEUR_LLM": {
+        "attendus": 6,
+        "detectes": 0,
+        "rappel": 0.0
+      },
+      "LEXIQUE": {
+        "attendus": 14,
+        "detectes": 14,
+        "rappel": 1.0
+      },
+      "REGLES_KB": {
+        "attendus": 9,
+        "detectes": 7,
+        "rappel": 0.7777777777777778
+      }
+    },
+    "confusion_matrix": {
+      "ORANGE->NONE": 2,
+      "ORANGE->ORANGE": 9,
+      "RED->NONE": 3,
+      "RED->ORANGE": 3,
+      "RED->RED": 12
+    },
+    "cost_measured_pages": 0,
+    "cost_unmeasured_pages": 10,
+    "avg_latency_s": 0.0077
+  },
+  "gates": {
+    "critical_recall": {
+      "status": "ECHEC",
+      "value": 0.6666666666666666,
+      "threshold": ">= 0.95",
+      "blocking": true
+    },
+    "precision": {
+      "status": "OK",
+      "value": 1.0,
+      "threshold": ">= 0.75",
+      "blocking": true
+    },
+    "false_red_on_true_negatives": {
+      "status": "OK",
+      "value": 0,
+      "threshold": "== 0",
+      "blocking": true
+    },
+    "frozen_zone_integrity": {
+      "status": "OK",
+      "value": 1.0,
+      "threshold": "== 1.0",
+      "blocking": true
+    },
+    "dom_skeleton_preservation": {
+      "status": "OK",
+      "value": 1.0,
+      "threshold": "== 1.0",
+      "blocking": true
+    },
+    "zero_residual_red": {
+      "status": "ECHEC",
+      "value": 0.9,
+      "threshold": "== 1.0",
+      "blocking": true
+    },
+    "rewrite_constraints": {
+      "status": "ECHEC",
+      "value": 0.9,
+      "threshold": "== 1.0",
+      "blocking": true
+    },
+    "seo_bridge_hit_rate": {
+      "status": "OK",
+      "value": 1.0,
+      "threshold": ">= 0.9",
+      "blocking": true
+    },
+    "avg_cost_eur_per_page": {
+      "status": "NON_MESURE",
+      "value": null,
+      "threshold": "<= 0.25",
+      "blocking": false,
+      "note": "Aucun appel LLM en mode replay : mesure obligatoire en mode live"
+    }
+  },
+  "verdict": "RELEASE_BLOQUEE",
+  "blocking_failures": [
+    "critical_recall",
+    "zero_residual_red",
+    "rewrite_constraints"
+  ],
+  "cases": [
+    {
+      "test_id": "GS-001",
+      "category": "THERAPEUTIQUE_FRONTALE_GARANTIE_CHIFFREE",
+      "detection": {
+        "expected_red": 3,
+        "tp_red": 3,
+        "critical_fn": [],
+        "expected_orange": 2,
+        "tp_orange": 2,
+        "orange_fn": [],
+        "tp_spans": 5,
+        "fp_spans": [],
+        "tolerated_spans": 1,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Soigne l'insomnie",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": [
+              "MELATONINE-ENDORM"
+            ]
+          }
+        ],
+        "output_text": "Mélatonine Pure 1,9 mg\nLa mélatonine contribue à réduire le temps d'endormissement* grâce à notre formule brevetée. * L'effet bénéfique est obtenu par la consommation de 1 mg de mélatonine peu de temps avant le coucher.\nPrendre 2 gélules 30 minutes avant le coucher, soit 1,9 mg de mélatonine.\nFlacon de 60 gélules – 24,90 €"
+      },
+      "kb_missing": [],
+      "latency_s": 0.0133,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-002",
+      "category": "SOUS_DOSAGE_CONDITION_VIOLEE",
+      "detection": {
+        "expected_red": 1,
+        "tp_red": 1,
+        "critical_fn": [],
+        "expected_orange": 0,
+        "tp_orange": 0,
+        "orange_fn": [],
+        "tp_spans": 1,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Notre Magnésium Marin+",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": []
+          }
+        ],
+        "output_text": "Notre Magnésium Marin+ est une formule simple : du magnésium marin, tout simplement.\n40 mg de magnésium marin par jour\n1 gélule par jour au petit-déjeuner\n14,90 € le flacon de 30 gélules"
+      },
+      "kb_missing": [],
+      "latency_s": 0.006,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-003",
+      "category": "REFERENCE_GENERALE_ISOLEE_ART10_3",
+      "detection": {
+        "expected_red": 0,
+        "tp_red": 0,
+        "critical_fn": [],
+        "expected_orange": 3,
+        "tp_orange": 3,
+        "orange_fn": [],
+        "tp_spans": 3,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Votre allié détox",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": [
+              "VIT_C-IMMUN"
+            ]
+          }
+        ],
+        "output_text": "Votre allié immunité au quotidien, avec de la vitamine C, qui contribue au fonctionnement normal du système immunitaire\nAcérola Bio 1000\nComprimés à croquer d'acérola bio, riches en vitamine C naturelle.\n2 comprimés par jour\n80 mg de vitamine C pour 2 comprimés (100 % des VNR)"
+      },
+      "kb_missing": [],
+      "latency_s": 0.0091,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-004",
+      "category": "COLLAGENE_SANS_COFACTEUR",
+      "detection": {
+        "expected_red": 2,
+        "tp_red": 0,
+        "critical_fn": [
+          {
+            "flag_id": "GS004-F1",
+            "quote": "régénère les cartilages usés",
+            "predicted": "ORANGE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          },
+          {
+            "flag_id": "GS004-F2",
+            "quote": "comble les rides profondes",
+            "predicted": "NONE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          }
+        ],
+        "expected_orange": 0,
+        "tp_orange": 0,
+        "orange_fn": [],
+        "tp_spans": 1,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Notre collagène marin hydrolysé",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": []
+          }
+        ],
+        "output_text": "Collagène Marin Pur\nNotre collagène marin hydrolysé en peptides de type I.\nPeptides de collagène marin de type I\n10 g par jour, à diluer dans un verre d'eau\n34,90 € la boîte de 30 sticks"
+      },
+      "kb_missing": [
+        "COLLAGENE_MARIN"
+      ],
+      "latency_s": 0.0057,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-005",
+      "category": "SAUVETAGE_COFACTEUR",
+      "detection": {
+        "expected_red": 2,
+        "tp_red": 0,
+        "critical_fn": [
+          {
+            "flag_id": "GS005-F1",
+            "quote": "régénère vos cartilages",
+            "predicted": "ORANGE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          },
+          {
+            "flag_id": "GS005-F2",
+            "quote": "repulpe la peau",
+            "predicted": "ORANGE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          }
+        ],
+        "expected_orange": 2,
+        "tp_orange": 2,
+        "orange_fn": [],
+        "tp_spans": 4,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Pour une peau ferme",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": [
+              "VIT_C-COLL-PEAU",
+              "VIT_C-COLL-CARTILAGE"
+            ]
+          }
+        ],
+        "output_text": "Collagène Beauté & Articulations\nNotre complément collagène peau et articulations associe le collagène marin à de la vitamine C, qui contribue à la formation normale de collagène pour assurer la fonction normale de la peau. La vitamine C contribue à la formation normale de collagène pour assurer la fonction normale des cartilages.\n10 g de collagène marin hydrolysé, 24 mg de vitamine C (30 % des VNR) et 50 µg de biotine (100 % des VNR) par jour\n1 stick par jour"
+      },
+      "kb_missing": [
+        "BIOTINE",
+        "COLLAGENE_MARIN"
+      ],
+      "latency_s": 0.0087,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-006",
+      "category": "PLANTE_ON_HOLD_VERBE_MEDICAL_VIGILANCE",
+      "detection": {
+        "expected_red": 4,
+        "tp_red": 3,
+        "critical_fn": [
+          {
+            "flag_id": "GS006-F4",
+            "quote": "fait chuter le cortisol",
+            "predicted": "NONE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          }
+        ],
+        "expected_orange": 1,
+        "tp_orange": 1,
+        "orange_fn": [],
+        "tp_spans": 4,
+        "fp_spans": [],
+        "tolerated_spans": 1,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Anxiolytique naturel",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": []
+          }
+        ],
+        "output_text": "Notre ashwagandha KSM-66 : un extrait de racine d'ashwagandha.\n600 mg d'extrait sec de racine d'ashwagandha (ratio 12:1) par gélule\n1 gélule par jour\n27,90 €"
+      },
+      "kb_missing": [],
+      "latency_s": 0.0063,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-007",
+      "category": "CONDITION_DE_PRISE_TRONQUEE",
+      "detection": {
+        "expected_red": 1,
+        "tp_red": 0,
+        "critical_fn": [
+          {
+            "flag_id": "GS007-F1",
+            "quote": "réduit l'excès de flatulences après le repas",
+            "predicted": "NONE",
+            "detectable_by": "REGLES_KB"
+          }
+        ],
+        "expected_orange": 2,
+        "tp_orange": 0,
+        "orange_fn": [
+          {
+            "flag_id": "GS007-F2",
+            "quote": "réduit",
+            "predicted": "NONE",
+            "detectable_by": "EXTRACTEUR_LLM"
+          },
+          {
+            "flag_id": "GS007-F3",
+            "quote": "Prendre 2 gélules avant le repas",
+            "predicted": "NONE",
+            "detectable_by": "REGLES_KB"
+          }
+        ],
+        "tp_spans": 0,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [
+          "réduit l'excès"
+        ],
+        "zero_residual_ok": false,
+        "constraints_ok": false,
+        "constraint_failures": [
+          "Cible « Le charbon végétal activé » : SANS_ENREGISTREMENT ['Aucune sortie de réécrivain enregistrée pour ce nœud']",
+          "Allégation attendue CHARBON_ACTIF-FLATULENCE absente de la base (KB_MISSING)",
+          "Mention CHARBON_ACTIF_REPAS absente de la base (KB_MISSING)"
+        ],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Le charbon végétal activé",
+            "status": "SANS_ENREGISTREMENT",
+            "errors": [
+              "Aucune sortie de réécrivain enregistrée pour ce nœud"
+            ],
+            "used_claims": []
+          }
+        ],
+        "output_text": "Le charbon végétal activé réduit l'excès de flatulences après le repas.\n500 mg de charbon végétal activé par gélule\nPrendre 2 gélules avant le repas\n9,90 € les 60 gélules"
+      },
+      "kb_missing": [
+        "CHARBON_ACTIF"
+      ],
+      "latency_s": 0.0039,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-008",
+      "category": "ARTICLE_BLOG_PONT_COMMERCIAL",
+      "detection": {
+        "expected_red": 5,
+        "tp_red": 5,
+        "critical_fn": [],
+        "expected_orange": 0,
+        "tp_orange": 0,
+        "orange_fn": [],
+        "tp_spans": 5,
+        "fp_spans": [],
+        "tolerated_spans": 1,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "L'arthrose cervicale",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": [
+              "VIT_C-COLL-CARTILAGE"
+            ]
+          },
+          {
+            "node_startswith": "Comment soulager",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": []
+          }
+        ],
+        "output_text": "Comment prendre soin de vos articulations ?\nPour vos articulations, misez sur de la vitamine C, qui contribue à la formation normale de collagène pour assurer la fonction normale des cartilages : découvrez notre cure articulaire.\nBouger chaque jour\nUne marche quotidienne de 30 minutes entretient la mobilité."
+      },
+      "kb_missing": [
+        "HARPAGOPHYTUM_PROCUMBENS"
+      ],
+      "latency_s": 0.0093,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-009",
+      "category": "STRESS_TEST_DOM_ZONES_GELEES",
+      "detection": {
+        "expected_red": 0,
+        "tp_red": 0,
+        "critical_fn": [],
+        "expected_orange": 1,
+        "tp_orange": 1,
+        "orange_fn": [],
+        "tp_spans": 1,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": true,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [
+          {
+            "node_startswith": "Vitamine B12 méthylcobalamine",
+            "status": "VALIDEE",
+            "errors": [],
+            "used_claims": [
+              "VIT_B12-ENERGIE"
+            ]
+          }
+        ],
+        "output_text": "29,90 € au lieu de 39,90 € (-25%)\nVitamine B12 méthylcobalamine : 3 gouttes 2 fois par jour, ne pas dépasser 150 µg par jour. La vitamine B12 contribue à un métabolisme énergétique normal.\nFlacon de 30 ml – 1 goutte = 25 µg"
+      },
+      "kb_missing": [],
+      "latency_s": 0.0061,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    },
+    {
+      "test_id": "GS-010",
+      "category": "VRAI_NEGATIF_ANTI_PARANOIA",
+      "detection": {
+        "expected_red": 0,
+        "tp_red": 0,
+        "critical_fn": [],
+        "expected_orange": 0,
+        "tp_orange": 0,
+        "orange_fn": [],
+        "tp_spans": 0,
+        "fp_spans": [],
+        "tolerated_spans": 0,
+        "remediation_ok": true
+      },
+      "rewrite": {
+        "applicable": true,
+        "frozen_ok": true,
+        "frozen_violations": [],
+        "dom_ok": true,
+        "dom_diffs": [],
+        "residual_red": 0,
+        "must_not_hits": [],
+        "zero_residual_ok": true,
+        "constraints_ok": true,
+        "constraint_failures": [],
+        "bridge_applicable": false,
+        "bridge_ok": true,
+        "unexpected_claims": [],
+        "target_statuses": [],
+        "output_text": "Magnésium Bisglycinate + B6\nFormulé avec du magnésium, qui contribue à réduire la fatigue, et de la vitamine B6, qui contribue au fonctionnement normal du système nerveux. Une formule pensée pour vos journées bien remplies.\n300 mg de magnésium (80 % des VNR) et 1,4 mg de vitamine B6 (100 % des VNR) pour 2 gélules\nConseils d'utilisation : 2 gélules par jour avec un grand verre d'eau\nNe pas dépasser la dose journalière recommandée. Tenir hors de portée des jeunes enfants. Les compléments alimentaires ne doivent pas être utilisés comme substituts d'un régime alimentaire varié et équilibré et d'un mode de vie sain."
+      },
+      "kb_missing": [],
+      "latency_s": 0.0085,
+      "tokens": {
+        "prompt_tokens": 0,
+        "cached_tokens": 0,
+        "completion_tokens": 0
+      },
+      "cost_eur": null
+    }
+  ]
+}

@@ -1,0 +1,342 @@
+{
+  "format": "rewriter-spans-1.0",
+  "recorded_with": "Fixtures manuelles : aucune sortie LLM réelle, aucun usage de tokens enregistré",
+  "cases": {
+    "GS-001": {
+      "targets": [
+        {
+          "node_startswith": "Soigne l'insomnie",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "MELATONINE-ENDORM-V00"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": " grâce à notre formule "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M2"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "brevetée"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M2"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-002": {
+      "targets": [
+        {
+          "node_startswith": "Notre Magnésium Marin+",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Notre "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "ZONE_GELEE",
+                "match": "Magnésium Marin+"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": " est une formule simple : "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M2"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "du magnésium marin, tout simplement."
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M2"
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-003": {
+      "targets": [
+        {
+          "node_startswith": "Votre allié détox",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Votre allié immunité au quotidien, "
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "VIT_C-IMMUN-V03"
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-004": {
+      "targets": [
+        {
+          "node_startswith": "Notre collagène marin hydrolysé",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Notre collagène marin hydrolysé "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "en peptides de type I"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-005": {
+      "targets": [
+        {
+          "node_startswith": "Pour une peau ferme",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Notre complément collagène peau et articulations associe le "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "collagène marin"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": " à "
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "VIT_C-COLL-PEAU-V02"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": ". "
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "VIT_C-COLL-CARTILAGE-V00"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-006": {
+      "targets": [
+        {
+          "node_startswith": "Anxiolytique naturel",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Notre "
+              },
+              {
+                "kind": "ZONE_GELEE",
+                "match": "ashwagandha KSM-66"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": " : un extrait de racine d'ashwagandha."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-007": {
+      "targets": [],
+      "usage": null
+    },
+    "GS-008": {
+      "targets": [
+        {
+          "node_startswith": "L'arthrose cervicale",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Pour vos articulations, misez sur "
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "VIT_C-COLL-CARTILAGE-V02"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": " : "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "découvrez notre cure articulaire"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "."
+              }
+            ]
+          }
+        },
+        {
+          "node_startswith": "Comment soulager",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Comment prendre soin de vos articulations ?"
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-009": {
+      "targets": [
+        {
+          "node_startswith": "Vitamine B12 méthylcobalamine",
+          "llm_output": {
+            "status": "OK",
+            "spans": [
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "Vitamine B12 méthylcobalamine : "
+              },
+              {
+                "kind": "BALISE_OUVRANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "ZONE_GELEE",
+                "match": "3 gouttes 2 fois par jour"
+              },
+              {
+                "kind": "BALISE_FERMANTE",
+                "ref": "M1"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": ", ne pas dépasser "
+              },
+              {
+                "kind": "ZONE_GELEE",
+                "match": "150 µg par jour"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": ". "
+              },
+              {
+                "kind": "ALLEGATION",
+                "ref": "VIT_B12-ENERGIE-V00"
+              },
+              {
+                "kind": "TEXTE_LIBRE",
+                "text": "."
+              }
+            ]
+          }
+        }
+      ],
+      "usage": null
+    },
+    "GS-010": {
+      "targets": [],
+      "usage": null
+    }
+  }
+}

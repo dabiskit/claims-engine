@@ -1,0 +1,8 @@
+{
+  "_comment": "Prix par million de tokens, en euros HT. À remplir avec les tarifs en vigueur (source + date). Un prix manquant rend le coût NON MESURÉ, jamais nul.",
+  "models": {
+    "extracteur": {"input_eur_per_mtok": null, "cached_input_eur_per_mtok": null, "output_eur_per_mtok": null, "source": null, "as_of": null},
+    "reranker":   {"input_eur_per_mtok": null, "cached_input_eur_per_mtok": null, "output_eur_per_mtok": null, "source": null, "as_of": null},
+    "reecrivain": {"input_eur_per_mtok": null, "cached_input_eur_per_mtok": null, "output_eur_per_mtok": null, "source": null, "as_of": null}
+  }
+}

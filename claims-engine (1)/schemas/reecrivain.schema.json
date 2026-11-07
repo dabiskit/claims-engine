@@ -1,0 +1,23 @@
+{
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["status", "spans", "notes_fr"],
+  "properties": {
+    "status": {"enum": ["OK", "IMPOSSIBLE_SANS_INVENTER"]},
+    "spans": {
+      "type": "array",
+      "maxItems": 80,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["kind"],
+        "properties": {
+          "kind": {"enum": ["TEXTE_LIBRE", "ALLEGATION", "ZONE_GELEE", "BALISE_OUVRANTE", "BALISE_FERMANTE", "BALISE_VIDE"]},
+          "text": {"type": "string", "maxLength": 800},
+          "ref": {"type": "string", "maxLength": 80}
+        }
+      }
+    },
+    "notes_fr": {"type": "string", "maxLength": 600}
+  }
+}

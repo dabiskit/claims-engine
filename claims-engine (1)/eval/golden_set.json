@@ -1,0 +1,1106 @@
+{
+  "format": "golden-set-1.0",
+  "description": "10 archétypes fondateurs (brouillon IA, à valider)",
+  "cases": [
+    {
+      "test_id": "GS-001",
+      "archetype": 1,
+      "category": "THERAPEUTIQUE_FRONTALE_GARANTIE_CHIFFREE",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/melatonine-pure",
+      "target_seo_query": "mélatonine sommeil",
+      "product_names": [
+        "Mélatonine Pure"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "MELATONINE",
+          "label": "mélatonine",
+          "amount": 1.9,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description rte\">\n  <h2>Mélatonine Pure 1,9 mg</h2>\n  <p><strong>Soigne l'insomnie chronique dès la 1ère nuit</strong> et réduit le cortisol de 40 % grâce à notre formule <a href=\"/pages/notre-science\">brevetée</a>.</p>\n  <ul>\n    <li>Prendre 2 gélules 30 minutes avant le coucher, soit 1,9 mg de mélatonine.</li>\n    <li>Flacon de 60 gélules – <span class=\"price\">24,90 €</span></li>\n  </ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "1,9 mg",
+          "2 gélules",
+          "30 minutes avant le coucher",
+          "60 gélules",
+          "24,90 €"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS001-F1",
+            "severity": "RED",
+            "quote": "Soigne",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": "MELATONINE",
+            "reason": "Propriété curative attribuée à un complément alimentaire.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS001-F2",
+            "severity": "RED",
+            "quote": "insomnie chronique",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": "MELATONINE",
+            "reason": "Pathologie (CIM-10 G47.0).",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS001-F3",
+            "severity": "ORANGE",
+            "quote": "dès la 1ère nuit",
+            "legal_basis": "CCONSO_PRATIQUE_TROMPEUSE",
+            "substance": "MELATONINE",
+            "reason": "Promesse de délai d'action.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS001-F4",
+            "severity": "RED",
+            "quote": "réduit le cortisol de 40 %",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "MELATONINE",
+            "reason": "Allégation de santé non autorisée, chiffrée, portant sur un biomarqueur.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS001-F5",
+            "severity": "ORANGE",
+            "quote": "",
+            "legal_basis": "VIGILANCE_SANITAIRE",
+            "substance": "MELATONINE",
+            "reason": "Avertissements de vigilance mélatonine absents de la page.",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": "VIGILANCE_MENTION_ABSENTE"
+          }
+        ],
+        "tolerated_extra_flags": [
+          {
+            "finding_code": "PRESENTATION_MEDICAMENTEUSE",
+            "reason": "Agrégat de page attendu quand des rouges coexistent"
+          },
+          {
+            "finding_code": "REFERENCE_GENERALE_ART10_3",
+            "quote": "nuit",
+            "reason": "« nuit » est déjà couvert par GS001-F3"
+          }
+        ],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Soigne l'insomnie"
+            }
+          ],
+          "expected_claim_ids": [
+            "MELATONINE-ENDORM"
+          ],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "endormissement"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "soigne",
+            "insomnie",
+            "cortisol",
+            "1ère nuit",
+            "40 %"
+          ],
+          "mandatory_notice_required": true,
+          "mandatory_notice_codes": [
+            "MELATONINE_COUCHER"
+          ]
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "1,9 mg pour 2 gélules prises ensemble : une portion quantifiée, condition de 1 mg remplie. Seuil national de dose journalière à vérifier."
+      }
+    },
+    {
+      "test_id": "GS-002",
+      "archetype": 2,
+      "category": "SOUS_DOSAGE_CONDITION_VIOLEE",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/magnesium-marin-plus",
+      "target_seo_query": "magnésium fatigue",
+      "product_names": [
+        "Magnésium Marin+"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "MG",
+          "label": "magnésium marin",
+          "amount": 40,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <p>Notre <strong>Magnésium Marin+</strong> est une formule simple : <strong>Le magnésium contribue à réduire la fatigue.</strong></p>\n  <ul>\n    <li>40 mg de magnésium marin par jour</li>\n    <li>1 gélule par jour au petit-déjeuner</li>\n    <li><span class=\"price\">14,90 €</span> le flacon de 30 gélules</li>\n  </ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "Magnésium Marin+",
+          "40 mg",
+          "1 gélule par jour",
+          "14,90 €",
+          "30 gélules"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS002-F1",
+            "severity": "RED",
+            "quote": "Le magnésium contribue à réduire la fatigue",
+            "legal_basis": "R432_2012_CONDITIONS",
+            "substance": "MG",
+            "reason": "Libellé exact, mais 40 mg < 56,25 mg (15 % de la VNR) : condition d'utilisation non remplie.",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Notre Magnésium Marin+"
+            }
+          ],
+          "expected_claim_ids": [],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "magnésium"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "contribue à réduire la fatigue",
+            "fatigue"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Alternative hors réécriture : reformuler à ≥ 56,25 mg."
+      }
+    },
+    {
+      "test_id": "GS-003",
+      "archetype": 3,
+      "category": "REFERENCE_GENERALE_ISOLEE_ART10_3",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/acerola-bio-1000",
+      "target_seo_query": "complément immunité",
+      "product_names": [
+        "Acérola Bio 1000"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "VIT_C",
+          "label": "vitamine C (acérola)",
+          "amount": 80,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product-single__meta\">\n  <span class=\"product-badge\">Votre allié détox, immunité et vitalité au quotidien</span>\n  <h1>Acérola Bio 1000</h1>\n  <p>Comprimés à croquer d'acérola bio, riches en vitamine C naturelle.</p>\n  <ul><li>2 comprimés par jour</li><li>80 mg de vitamine C pour 2 comprimés (100 % des VNR)</li></ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "Acérola Bio 1000",
+          "2 comprimés par jour",
+          "80 mg",
+          "100 % des VNR"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS003-F1",
+            "severity": "ORANGE",
+            "quote": "détox",
+            "legal_basis": "DOCTRINE_ADMINISTRATIVE",
+            "substance": null,
+            "reason": "Terme doctrinal à risque.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS003-F2",
+            "severity": "ORANGE",
+            "quote": "immunité",
+            "legal_basis": "R1924_2006_ART10_3",
+            "substance": "VIT_C",
+            "reason": "Référence générale sans allégation spécifique sur la page.",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS003-F3",
+            "severity": "ORANGE",
+            "quote": "vitalité",
+            "legal_basis": "R1924_2006_ART10_3",
+            "substance": null,
+            "reason": "Référence générale sans allégation spécifique possible (aucun ancrage « vitalité »).",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Votre allié détox"
+            }
+          ],
+          "expected_claim_ids": [
+            "VIT_C-IMMUN"
+          ],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "immunité",
+              "système immunitaire"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "détox",
+            "vitalité"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Gravité ORANGE conforme au plan V2 (art. 10§3 = revue)."
+      }
+    },
+    {
+      "test_id": "GS-004",
+      "archetype": 4,
+      "category": "COLLAGENE_SANS_COFACTEUR",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/collagene-marin-pur",
+      "target_seo_query": "collagène marin",
+      "product_names": [
+        "Collagène Marin Pur"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "COLLAGENE_MARIN",
+          "label": "peptides de collagène marin hydrolysé",
+          "amount": 10,
+          "unit": "g",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <h2>Collagène Marin Pur</h2>\n  <p>Notre collagène marin hydrolysé <strong>régénère les cartilages usés</strong> et comble les rides profondes.</p>\n  <ul><li>Peptides de collagène marin de type I</li><li>10 g par jour, à diluer dans un verre d'eau</li><li><span class=\"price\">34,90 €</span> la boîte de 30 sticks</li></ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "Collagène Marin Pur",
+          "10 g par jour",
+          "34,90 €",
+          "30 sticks"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS004-F1",
+            "severity": "RED",
+            "quote": "régénère les cartilages usés",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "COLLAGENE_MARIN",
+            "reason": "Allégation de santé non autorisée ; « usés » renvoie à une dégénérescence articulaire.",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS004-F2",
+            "severity": "RED",
+            "quote": "comble les rides profondes",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "COLLAGENE_MARIN",
+            "reason": "Allégation de santé non autorisée (aucune allégation sur le collagène).",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Notre collagène marin hydrolysé"
+            }
+          ],
+          "expected_claim_ids": [],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": "AUCUN_COFACTEUR : aucune allégation de santé possible, description factuelle",
+          "seo_bridge": {
+            "must_contain_any": [
+              "collagène marin"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "régénère",
+            "cartilage",
+            "rides",
+            "comble"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [
+        "COLLAGENE_MARIN"
+      ],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Seul le nom de l'ingrédient est récupérable en SEO."
+      }
+    },
+    {
+      "test_id": "GS-005",
+      "archetype": 5,
+      "category": "SAUVETAGE_COFACTEUR",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/collagene-beaute-articulations",
+      "target_seo_query": "complément collagène peau",
+      "product_names": [
+        "Collagène Beauté & Articulations"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "COLLAGENE_MARIN",
+          "label": "collagène marin hydrolysé",
+          "amount": 10,
+          "unit": "g",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        },
+        {
+          "substance": "VIT_C",
+          "label": "vitamine C",
+          "amount": 24,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        },
+        {
+          "substance": "BIOTINE",
+          "label": "biotine",
+          "amount": 50,
+          "unit": "µg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <h2>Collagène Beauté &amp; Articulations</h2>\n  <p>Pour une peau ferme et des articulations souples, notre <strong>collagène marin</strong> régénère vos cartilages et repulpe la peau.</p>\n  <ul><li>10 g de collagène marin hydrolysé, 24 mg de vitamine C (30 % des VNR) et 50 µg de biotine (100 % des VNR) par jour</li><li>1 stick par jour</li></ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "Collagène Beauté & Articulations",
+          "10 g",
+          "24 mg",
+          "30 % des VNR",
+          "50 µg",
+          "100 % des VNR",
+          "1 stick par jour"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS005-F1",
+            "severity": "RED",
+            "quote": "régénère vos cartilages",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "COLLAGENE_MARIN",
+            "reason": "Effet attribué au collagène, sans allégation autorisée.",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS005-F2",
+            "severity": "RED",
+            "quote": "repulpe la peau",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "COLLAGENE_MARIN",
+            "reason": "Effet attribué au collagène, sans allégation autorisée.",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS005-F3",
+            "severity": "ORANGE",
+            "quote": "peau ferme et des articulations souples",
+            "legal_basis": "R1924_2006_ART10_3",
+            "substance": null,
+            "reason": "Références générales non accompagnées sur la page d'origine.",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS005-F4",
+            "severity": "ORANGE",
+            "quote": "Articulations",
+            "legal_basis": "R1924_2006_ART1_3",
+            "substance": null,
+            "reason": "Nom de produit évoquant une fonction : doit être accompagné d'une allégation (art. 1§3). Ajouté après adjudication du premier run (relevé par le moteur, manqué par l'annotateur).",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": "Collagène Beauté",
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Pour une peau ferme"
+            }
+          ],
+          "expected_claim_ids": [
+            "VIT_C-COLL-PEAU"
+          ],
+          "allowed_claim_ids": [
+            "VIT_C-COLL-CARTILAGE"
+          ],
+          "future_claim_ids_when_kb_ready": [
+            "BIOTINE-PEAU"
+          ],
+          "cofactor_strategy": "Effet porté par la vitamine C (et la biotine au lot 2), jamais par le collagène",
+          "seo_bridge": {
+            "must_contain_any": [],
+            "must_contain_all": [
+              "collagène",
+              "peau"
+            ]
+          },
+          "must_not_contain": [
+            "régénère",
+            "repulpe",
+            "peau ferme",
+            "collagène contribue",
+            "collagène, qui contribue",
+            "collagène qui contribue"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [
+        "COLLAGENE_MARIN",
+        "BIOTINE"
+      ],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "La reprise exacte « complément collagène peau » en titre reste une décision de l'expert ; le test exige seulement que les deux termes survivent."
+      }
+    },
+    {
+      "test_id": "GS-006",
+      "archetype": 6,
+      "category": "PLANTE_ON_HOLD_VERBE_MEDICAL_VIGILANCE",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/ashwagandha-ksm66",
+      "target_seo_query": "ashwagandha stress",
+      "product_names": [
+        "Ashwagandha KSM-66"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "WITHANIA_SOMNIFERA",
+          "label": "extrait sec de racine d'ashwagandha",
+          "amount": 600,
+          "unit": "mg",
+          "plant_part": "RACINE",
+          "preparation": "EXTRAIT_SEC",
+          "der_ratio": 12
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <p><strong>Anxiolytique naturel puissant</strong> contre le burn-out et l'anxiété : notre ashwagandha KSM-66 fait chuter le cortisol.</p>\n  <ul><li>600 mg d'extrait sec de racine d'ashwagandha (ratio 12:1) par gélule</li><li>1 gélule par jour</li><li><span class=\"price\">27,90 €</span></li></ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "600 mg",
+          "ratio 12:1",
+          "1 gélule par jour",
+          "27,90 €"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS006-F1",
+            "severity": "RED",
+            "quote": "Anxiolytique",
+            "legal_basis": "CSP_L5111_1_PRESENTATION",
+            "substance": "WITHANIA_SOMNIFERA",
+            "reason": "Classe médicamenteuse.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS006-F2",
+            "severity": "RED",
+            "quote": "burn-out",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": "WITHANIA_SOMNIFERA",
+            "reason": "Pathologie.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS006-F3",
+            "severity": "RED",
+            "quote": "anxiété",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": "WITHANIA_SOMNIFERA",
+            "reason": "Pathologie.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS006-F4",
+            "severity": "RED",
+            "quote": "fait chuter le cortisol",
+            "legal_basis": "R1924_2006_ART10_1",
+            "substance": "WITHANIA_SOMNIFERA",
+            "reason": "Allégation sur un biomarqueur, sans correspondance on-hold.",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS006-F5",
+            "severity": "ORANGE",
+            "quote": "",
+            "legal_basis": "VIGILANCE_SANITAIRE",
+            "substance": "WITHANIA_SOMNIFERA",
+            "reason": "Mentions de vigilance absentes (grossesse, allaitement, enfants, thyroïde…).",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": "VIGILANCE_MENTION_ABSENTE"
+          }
+        ],
+        "tolerated_extra_flags": [
+          {
+            "finding_code": "PRESENTATION_MEDICAMENTEUSE",
+            "reason": "Agrégat de page attendu quand des rouges coexistent"
+          }
+        ],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Anxiolytique naturel"
+            }
+          ],
+          "expected_claim_ids": [],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [
+            "ONHOLD-WITHANIA (relaxation) — à importer"
+          ],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "ashwagandha"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "anxiolytique",
+            "burn-out",
+            "anxiété",
+            "cortisol"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Équivalent racine : 600 mg × 12 = 7,2 g. Tant que la liste on-hold n'est pas importée, aucune allégation botanique n'est attendue : le moteur ne doit pas en inventer. Ashwagandha retenu plutôt que curcuma (lot 2)."
+      }
+    },
+    {
+      "test_id": "GS-007",
+      "archetype": 7,
+      "category": "CONDITION_DE_PRISE_TRONQUEE",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/charbon-vegetal-active",
+      "target_seo_query": "charbon actif ballonnements",
+      "product_names": [
+        "Charbon Végétal Activé"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "CHARBON_ACTIF",
+          "label": "charbon végétal activé",
+          "amount": 1000,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <p>Le <strong>charbon végétal activé</strong> réduit l'excès de flatulences après le repas.</p>\n  <ul><li>500 mg de charbon végétal activé par gélule</li><li>Prendre 2 gélules avant le repas</li><li><span class=\"price\">9,90 €</span> les 60 gélules</li></ul>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "500 mg",
+          "2 gélules",
+          "9,90 €",
+          "60 gélules"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS007-F1",
+            "severity": "RED",
+            "quote": "réduit l'excès de flatulences après le repas",
+            "legal_basis": "R432_2012_CONDITIONS",
+            "substance": "CHARBON_ACTIF",
+            "reason": "Information obligatoire absente (1 g au moins 30 min avant et 1 g peu après le repas).",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS007-F2",
+            "severity": "ORANGE",
+            "quote": "réduit",
+            "legal_basis": "R432_2012_CONDITIONS",
+            "substance": "CHARBON_ACTIF",
+            "reason": "Formulation renforcée : « réduit » au lieu de « contribue à réduire ».",
+            "detectable_by": "EXTRACTEUR_LLM",
+            "node_startswith": null,
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS007-F3",
+            "severity": "ORANGE",
+            "quote": "Prendre 2 gélules avant le repas",
+            "legal_basis": "R432_2012_CONDITIONS",
+            "substance": "CHARBON_ACTIF",
+            "reason": "Posologie incompatible avec la condition (aucune prise après le repas).",
+            "detectable_by": "REGLES_KB",
+            "node_startswith": null,
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Le charbon végétal activé"
+            }
+          ],
+          "expected_claim_ids": [
+            "CHARBON_ACTIF-FLATULENCE"
+          ],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "flatulence"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "réduit l'excès"
+          ],
+          "mandatory_notice_required": true,
+          "mandatory_notice_codes": [
+            "CHARBON_ACTIF_REPAS"
+          ]
+        }
+      },
+      "requires_kb": [
+        "CHARBON_ACTIF"
+      ],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Libellé FR officiel de l'allégation charbon actif à vérifier (lot 3)."
+      }
+    },
+    {
+      "test_id": "GS-008",
+      "archetype": 8,
+      "category": "ARTICLE_BLOG_PONT_COMMERCIAL",
+      "page_mode": "EDITORIAL_BLOG",
+      "page_url": "https://boutique.example/blogs/conseils/arthrose-cervicale",
+      "target_seo_query": "soulager arthrose cervicale naturellement",
+      "product_names": [
+        "Complexe Harpagophytum"
+      ],
+      "portions_per_day": 1,
+      "product_composition": [],
+      "linked_products": [
+        {
+          "path": "/products/complexe-harpagophytum",
+          "name": "Complexe Harpagophytum",
+          "composition": [
+            {
+              "substance": "VIT_C",
+              "label": "vitamine C",
+              "amount": 80,
+              "unit": "mg",
+              "plant_part": null,
+              "preparation": null,
+              "der_ratio": null
+            },
+            {
+              "substance": "HARPAGOPHYTUM_PROCUMBENS",
+              "label": "harpagophytum",
+              "amount": 600,
+              "unit": "mg",
+              "plant_part": "RACINE",
+              "preparation": "POUDRE_PLANTE_SECHE",
+              "der_ratio": null
+            }
+          ]
+        }
+      ],
+      "input_html_nodes": "<article class=\"article-template\">\n  <h1>Comment soulager l'arthrose cervicale naturellement ?</h1>\n  <p>L'arthrose cervicale touche de nombreux adultes après 50 ans. Pour la soulager naturellement, <a href=\"/products/complexe-harpagophytum\">découvrez notre cure articulaire</a>.</p>\n  <h2>Bouger chaque jour</h2>\n  <p>Une marche quotidienne de 30 minutes entretient la mobilité.</p>\n</article>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "30 minutes"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS008-F1",
+            "severity": "RED",
+            "quote": "soulager",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": null,
+            "reason": "Verbe thérapeutique dans un article relié à un produit.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": "Comment soulager",
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS008-F2",
+            "severity": "RED",
+            "quote": "arthrose cervicale",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": null,
+            "reason": "Pathologie en titre d'un article commercial.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": "Comment soulager",
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS008-F3",
+            "severity": "RED",
+            "quote": "soulager",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": null,
+            "reason": "Verbe thérapeutique dans le segment du lien produit.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": "L'arthrose cervicale",
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS008-F4",
+            "severity": "RED",
+            "quote": "arthrose cervicale",
+            "legal_basis": "INCO_1169_2011_ART7_3",
+            "substance": null,
+            "reason": "Pathologie dans le segment du lien produit.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": "L'arthrose cervicale",
+            "finding_code": null
+          },
+          {
+            "flag_id": "GS008-F5",
+            "severity": "RED",
+            "quote": "",
+            "legal_basis": "CSP_L5111_1_PRESENTATION",
+            "substance": null,
+            "reason": "Article ciblant une pathologie et relié à un produit : présentation d'ensemble commerciale.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": "ARTICLE_CIBLE_PATHOLOGIE_AVEC_PONT"
+          }
+        ],
+        "tolerated_extra_flags": [
+          {
+            "finding_code": "PRESENTATION_MEDICAMENTEUSE",
+            "reason": "Agrégat de page attendu quand des rouges coexistent"
+          }
+        ],
+        "expected_remediation_codes": [
+          "SUPPRIMER_PONT",
+          "RECADRER_VERS_PONT_SEMANTIQUE"
+        ],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "L'arthrose cervicale"
+            },
+            {
+              "node_startswith": "Comment soulager"
+            }
+          ],
+          "expected_claim_ids": [],
+          "allowed_claim_ids": [
+            "VIT_C-COLL-CARTILAGE"
+          ],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "articulations",
+              "articulaire",
+              "cartilage"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "soulager",
+            "arthrose"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Double arbitrage : la suppression du lien est une action utilisateur (le réécrivain ne touche jamais au DOM) ; la réécriture teste l'option « pont sémantique » avec lien conservé."
+      }
+    },
+    {
+      "test_id": "GS-009",
+      "archetype": 9,
+      "category": "STRESS_TEST_DOM_ZONES_GELEES",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/b12-gouttes",
+      "target_seo_query": "vitamine B12 gouttes",
+      "product_names": [],
+      "portions_per_day": 2,
+      "product_composition": [
+        {
+          "substance": "VIT_B12",
+          "label": "méthylcobalamine",
+          "amount": 150,
+          "unit": "µg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product-form__info\" data-variant-id=\"409281\" data-product-handle=\"b12-gouttes\">\n  <p class=\"price-wrapper\"><span class=\"price price--sale\">29,90 €</span> au lieu de <s class=\"price--compare\">39,90 €</s> <span class=\"badge badge--sale\">(-25%)</span></p>\n  <p>Vitamine B12 méthylcobalamine : <strong>3 gouttes 2 fois par jour</strong>, ne pas dépasser 150 µg par jour. Booste votre énergie !</p>\n  <p class=\"variant-sku\" data-sku=\"B12-GTT-30ML\">Flacon de 30 ml – 1 goutte = 25 µg</p>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "29,90 €",
+          "39,90 €",
+          "-25%",
+          "3 gouttes 2 fois par jour",
+          "150 µg par jour",
+          "30 ml",
+          "1 goutte",
+          "25 µg"
+        ],
+        "expected_flags": [
+          {
+            "flag_id": "GS009-F1",
+            "severity": "ORANGE",
+            "quote": "Booste votre énergie",
+            "legal_basis": "DOCTRINE_ADMINISTRATIVE",
+            "substance": "VIT_B12",
+            "reason": "Exagération (« booste ») d'une fonction couverte par une allégation autorisée.",
+            "detectable_by": "LEXIQUE",
+            "node_startswith": null,
+            "finding_code": null
+          }
+        ],
+        "tolerated_extra_flags": [
+          {
+            "finding_code": "REFERENCE_GENERALE_ART10_3",
+            "quote": "énergie",
+            "reason": "Couvert par GS009-F1"
+          }
+        ],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": true,
+          "rewrite_targets": [
+            {
+              "node_startswith": "Vitamine B12 méthylcobalamine"
+            }
+          ],
+          "expected_claim_ids": [
+            "VIT_B12-ENERGIE"
+          ],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [
+              "énergétique"
+            ],
+            "must_contain_all": []
+          },
+          "must_not_contain": [
+            "booste"
+          ],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Seul le 2e paragraphe est réécrit ; prix, remise, SKU et attributs data-* doivent survivre à l'identique."
+      }
+    },
+    {
+      "test_id": "GS-010",
+      "archetype": 10,
+      "category": "VRAI_NEGATIF_ANTI_PARANOIA",
+      "page_mode": "PRODUCT_PAGE",
+      "page_url": "https://boutique.example/products/magnesium-bisglycinate-b6",
+      "target_seo_query": "magnésium B6",
+      "product_names": [],
+      "portions_per_day": 1,
+      "product_composition": [
+        {
+          "substance": "MG",
+          "label": "bisglycinate de magnésium (en magnésium)",
+          "amount": 300,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        },
+        {
+          "substance": "VIT_B6",
+          "label": "vitamine B6",
+          "amount": 1.4,
+          "unit": "mg",
+          "plant_part": null,
+          "preparation": null,
+          "der_ratio": null
+        }
+      ],
+      "linked_products": [],
+      "input_html_nodes": "<div class=\"product__description\">\n  <h2>Magnésium Bisglycinate + B6</h2>\n  <p>Formulé avec du magnésium, qui contribue à réduire la fatigue, et de la vitamine B6, qui contribue au fonctionnement normal du système nerveux. Une formule pensée pour <strong>vos journées bien remplies</strong>.</p>\n  <ul>\n    <li>300 mg de magnésium (80 % des VNR) et 1,4 mg de vitamine B6 (100 % des VNR) pour 2 gélules</li>\n    <li>Conseils d'utilisation : 2 gélules par jour avec un grand verre d'eau</li>\n  </ul>\n  <p>Ne pas dépasser la dose journalière recommandée. Tenir hors de portée des jeunes enfants. Les compléments alimentaires ne doivent pas être utilisés comme substituts d'un régime alimentaire varié et équilibré et d'un mode de vie sain.</p>\n</div>",
+      "expected_ground_truth": {
+        "frozen_zones": [
+          "300 mg",
+          "80 % des VNR",
+          "1,4 mg",
+          "100 % des VNR",
+          "2 gélules",
+          "Ne pas dépasser la dose journalière recommandée",
+          "Tenir hors de portée des jeunes enfants"
+        ],
+        "expected_flags": [],
+        "tolerated_extra_flags": [],
+        "expected_remediation_codes": [],
+        "expected_rewrite_constraints": {
+          "rewrite_expected": false,
+          "rewrite_targets": [],
+          "expected_claim_ids": [],
+          "allowed_claim_ids": [],
+          "future_claim_ids_when_kb_ready": [],
+          "cofactor_strategy": null,
+          "seo_bridge": {
+            "must_contain_any": [],
+            "must_contain_all": []
+          },
+          "must_not_contain": [],
+          "mandatory_notice_required": false,
+          "mandatory_notice_codes": []
+        }
+      },
+      "requires_kb": [],
+      "annotation": {
+        "annotated_by": "assistant-ia (brouillon)",
+        "expert_validated": false,
+        "notes": "Flexibilité syntaxique limitée à ce que la base valide : prédicats officiels intacts, sujet en apposition (« du magnésium, qui contribue… »)."
+      }
+    }
+  ]
+}
