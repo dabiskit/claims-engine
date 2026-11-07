@@ -376,6 +376,9 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
     detected = []
     if not composition:
         texts = [n.text_plain for n in page.nodes]
+        # lignes de tableau (composition, valeurs nutritionnelles) : cellules réunies sur une ligne
+        texts += [" ".join(td.text_content().strip() for td in tr.xpath("./td|./th"))
+                  for tr in lxml_html.document_fromstring(doc).xpath("//tr")]
         if info and info.description:
             texts.append(info.description)
         aliases, labels = _substance_names()
