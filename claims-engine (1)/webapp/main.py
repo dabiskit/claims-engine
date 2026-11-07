@@ -57,6 +57,7 @@ from engine.mode_router import lexical_hits  # noqa: E402
 from engine.page_scope import detect_composition, isolate  # noqa: E402
 from engine.textnorm import norm  # noqa: E402
 from webapp import kb_sync  # noqa: E402
+from webapp.suggest import LEGAL_URLS, REGISTER_URL, Suggester  # noqa: E402
 from eval.pipeline_adapter import KnowledgeBase, ReplayPipeline, product_of  # noqa: E402
 
 APP_NAME = os.environ.get("APP_NAME", "Pré-analyse des allégations")
@@ -460,12 +461,14 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
         item = {"code": f.code, "ai": f.code.startswith("IA_"), "level": f.level, "level_label": LEVELS.get(f.level, (f.level, ""))[0],
                 "css": LEVELS.get(f.level, ("", "info"))[1], "quote": f.quote, "explanation": explain(f),
                 "legal": LEGAL_LABELS.get(f.legal_basis or "", f.legal_basis or ""),
+                "legal_url": LEGAL_URLS.get(f.legal_basis or ""),
                 "substance": SUBSTANCES.get(f.substance or "", {}).get("name_fr"),
-                "remediations": [REMEDIATIONS.get(r, r) for r in dict.fromkeys(f.remediation_codes)]}
+                "remediations": [REMEDIATIONS.get(r, r) for r in dict.fromkeys(f.remediation_codes)],
+                "_lex": f.lexical_code, "_node": f.node_text}
         if f.code in ("REFERENCE_GENERALE_ART10_3", "IA_REFERENCE_GENERALE") and f.node_key:
             term = norm(f.quote or "")
             g = general_refs.setdefault(term, {"term": f.quote, "count": 0, "examples": [], "explanation": item["explanation"],
-                                               "legal": item["legal"]})
+                                               "legal": item["legal"], "legal_url": item["legal_url"]})
             g["count"] += 1
             if len(g["examples"]) < 3 and f.node_text not in g["examples"]:
                 g["examples"].append(f.node_text[:220])
@@ -512,6 +515,17 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
                        "claims": claims, "pending_onhold": SUBSTANCES[code]["kind"] == "PLANTE",
                        "n_ok": sum(1 for c in claims if c["status"][1] == "ok")})
 
+    # Propositions de remplacement (base uniquement) : libellé de substitution, allégations autorisées du même thème.
+    status_by_claim = {c["code"]: c["status"] for u in usable for c in u["claims"]}
+    sugg = Suggester(KB.claims, status_by_claim, SUBSTANCES, KB.bridges, LEXICON)
+    for n in nodes.values():
+        for it in n["findings"]:
+            it["suggestion"] = sugg.suggest(it["code"], it.pop("_lex", None), it["quote"], it.pop("_node", ""))
+    for it in page_level:
+        it.pop("_lex", None), it.pop("_node", None)
+    for g in general_refs.values():
+        g["claims"], g["others"] = sugg.claims_for(g["term"] or "", limit=2)
+
     # Substances fréquentes sans allégation autorisée (registre de l'Union) : nom, description, tableaux.
     label_text = " ".join(filter(None, [product_name, info.description if info else None, info.category if info else None,
                                         *[n.text_plain for n in page.nodes if n.zone in ("TABLEAU", "TITRE")]]))
@@ -541,7 +555,7 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
             "counts": counts, "nodes": node_list, "priorities": priorities,
             "general_refs": sorted(general_refs.values(), key=lambda g: -g["count"]),
             "page_level": page_level, "recognized": recognized, "usable": usable, "rejected": rejected,
-            "product": product_card, "reviews": reviews,
+            "product": product_card, "reviews": reviews, "register_url": REGISTER_URL,
             "scope": {"dropped": scope.dropped_summary() if scope else [], "used_main": bool(scope and scope.used_main),
                       "nodes": len(page.nodes)},
             "kb_missing": analysis.kb_missing_substances, "kb_release": KB.release,
@@ -769,6 +783,10 @@ tbody tr:hover td,table tr:hover td{background:color-mix(in srgb,var(--surface-2
 td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
 .card.flush .pad{padding-left:var(--s6);padding-right:var(--s6)}.card.flush .card-head.pad{padding-top:var(--s5)}
 
+.suggest{margin-top:var(--s2);padding:var(--s3) var(--s4);border:1px solid var(--ok-line);background:color-mix(in srgb,var(--ok-bg) 55%,var(--surface));border-radius:var(--r2)}
+.suggest .suggest-title{font-size:var(--f-xs);font-weight:600;letter-spacing:.04em;text-transform:uppercase;color:var(--ok);margin-bottom:var(--s1)}
+.suggest p{margin:0 0 var(--s1)}.suggest .list-plain li{padding:var(--s1) 0}
+
 /* ---- Repliables ---- */
 details>summary{cursor:pointer;list-style:none;display:flex;align-items:center;gap:var(--s2);color:var(--text-2);font-size:var(--f-md);border-radius:var(--r1)}
 details>summary::-webkit-details-marker{display:none}
@@ -917,6 +935,13 @@ T = {
 {% endblock %}""",
 
 "result": """{% extends "base" %}{% block content %}
+{% macro legal(f, prefix='') %}{% if f.legal %}{{ prefix }}{% if f.legal_url %}<a href="{{ f.legal_url }}" target="_blank" rel="noopener">{{ f.legal }}</a>{% else %}{{ f.legal }}{% endif %}{% endif %}{% endmacro %}
+{% macro sug(x) %}{% if x %}<div class="suggest"><div class="suggest-title">Proposition de remplacement</div>
+{% if x.replace_with %}<p>Remplacer par : <strong>« {{ x.replace_with }} »</strong></p>{% endif %}
+{% if x.advice %}<p class="muted small">{{ x.advice }}</p>{% endif %}
+{% if x.claims %}<p class="small">Allégation{{ 's' if x.claims|length > 1 }} autorisée{{ 's' if x.claims|length > 1 }} sur ce thème :</p><ul class="list-plain small">{% for c in x.claims %}<li>{% if c.status %}<span class="tag {{ c.css }}">{{ c.status }}</span> {% endif %}« {{ c.text }} »{% if c.source_url %} <a class="faint" href="{{ c.source_url }}" target="_blank" rel="noopener">source</a>{% endif %}{% if not c.status %} <span class="faint">({{ c.substance }} : absent de la composition)</span>{% endif %}</li>{% endfor %}</ul>
+{% elif x.others %}<p class="small muted">Aucun ingrédient de la composition n'a d'allégation autorisée sur ce thème. Ingrédients qui en ont une : {{ x.others|join(', ') }}.</p>{% endif %}</div>{% endif %}{% endmacro %}
+
 <nav class="crumb" aria-label="Fil d'Ariane"><a href="/app">← Nouvelle analyse</a>{% if r.audit_id %}<a href="/app/audits/{{ r.audit_id }}">← Retour à l'audit</a>{% endif %}</nav>
 <section class="card">
 {% if r.product and r.product.name %}<div class="product">
@@ -936,7 +961,8 @@ T = {
 {% if r.ai_error %}<p class="callout warn"><span><strong>Extraction IA indisponible</strong> : seules les règles et le lexique ont été appliqués. <span class="muted">Détail technique : {{ r.ai_error }}</span></span></p>{% endif %}
 
 {% if r.priorities %}<section class="card"><div class="card-head"><h2>À traiter en premier</h2><span class="tag red">{{ r.priorities|length }}</span></div>
-<ol class="prio">{% for f in r.priorities %}<li><div><span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}{% if f.legal %}<div class="faint small">{{ f.legal }}</div>{% endif %}</div></li>{% endfor %}</ol></section>{% endif %}
+<ol class="prio">{% for f in r.priorities %}<li><div><span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}{% if f.legal %}<div class="faint small">{{ legal(f) }}</div>{% endif %}
+{% if f.suggestion and f.suggestion.replace_with %}<div class="small">Remplacer par : <strong>« {{ f.suggestion.replace_with }} »</strong></div>{% elif f.suggestion and f.suggestion.claims %}<div class="small">Allégation autorisée à utiliser : « {{ f.suggestion.claims[0].text }} »</div>{% endif %}</div></li>{% endfor %}</ol></section>{% endif %}
 
 <div class="grid">
 {% if r.composition_source %}<section class="card"><h2>Composition {{ {'declaree': 'déclarée', 'detectee': 'détectée dans la page', 'absente': ''}[r.composition_source] }}</h2>
@@ -950,25 +976,26 @@ T = {
 {% for x in r.rejected %}<div class="claim"><span class="tag red">Aucune allégation autorisée</span> <strong>{{ x.name }}</strong>
 <p class="small muted">Le registre de l'Union recense {{ x.count }} demande(s) d'allégation refusée(s) pour cet ingrédient. Toute promesse de santé qui lui est attribuée est à revoir.</p>
 <details><summary class="small">Exemples de demandes refusées (texte officiel, en anglais)</summary><ul class="small">{% for e in x.examples %}<li>« {{ e.claim }} » <span class="faint">({{ e.substance }} · {{ e.id }})</span></li>{% endfor %}</ul></details></div>{% endfor %}
-<p class="faint xs">Source : registre de l'Union des allégations nutritionnelles et de santé (Commission européenne).</p></section>{% endif %}
+<p class="faint xs">Source : <a href="{{ r.register_url or 'https://ec.europa.eu/food/food-feed-portal/screen/health-claims/eu-register' }}" target="_blank" rel="noopener">registre de l'Union des allégations nutritionnelles et de santé (Commission européenne)</a>.</p></section>{% endif %}
 </div>
 
 {% set reds = r.nodes|selectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else r.nodes %}
 {% set others = r.nodes|rejectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else [] %}
 {% macro node_card(n) %}<article class="card"><p class="passage {{ 'red' if n.has_red }}">{{ n.html|safe }}</p>
 {% for f in n.findings %}<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{% if f.ai %}<span class="tag info">IA</span> {% endif %}<span class="q">« {{ f.quote }} »</span> — {{ f.explanation }}
-{% if f.legal %}<div class="meta">Fondement : {{ f.legal }}</div>{% endif %}
-{% if f.remediations %}<div class="meta">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div></div>{% endfor %}</article>{% endmacro %}
+{% if f.legal %}<div class="meta">{{ legal(f, 'Fondement : ') }}</div>{% endif %}
+{% if f.suggestion %}{{ sug(f.suggestion) }}{% elif f.remediations %}<div class="meta">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div></div>{% endfor %}</article>{% endmacro %}
 {% if reds %}<div class="section-title"><h2>Passages à revoir en priorité ({{ reds|length }})</h2></div>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
 {% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary><div class="stack">{% for n in others %}{{ node_card(n) }}{% endfor %}</div></details>{% endif %}
 
 {% if r.general_refs %}<section class="card flush"><div class="card-head pad"><h2>Références générales à la santé ({{ r.general_refs|map(attribute='count')|sum }} mentions)</h2></div>
-<p class="muted small pad">Un bienfait général (« peau », « articulations », « immunité ») n'est permis que s'il est accompagné d'une allégation autorisée spécifique sur la page (Règl. (CE) 1924/2006, art. 10§3). Regroupées par terme :</p>
-<div class="scroll"><table><tr><th>Terme</th><th class="num">Occurrences</th><th>Exemples</th></tr>{% for g in r.general_refs %}<tr><td><span class="tag orange">{{ g.term }}</span></td><td class="num">{{ g.count }}</td>
+<p class="muted small pad">Un bienfait général (« peau », « articulations », « immunité ») n'est permis que s'il est accompagné d'une allégation autorisée spécifique sur la page (<a href="https://eur-lex.europa.eu/legal-content/FR/TXT/HTML/?uri=CELEX:32006R1924#art_10" target="_blank" rel="noopener">Règl. (CE) 1924/2006, art. 10§3</a>). Regroupées par terme, avec l'allégation autorisée à placer à côté :</p>
+<div class="scroll"><table><tr><th>Terme</th><th class="num">Occurrences</th><th>Allégation autorisée à associer</th><th>Exemples</th></tr>{% for g in r.general_refs %}<tr><td><span class="tag orange">{{ g.term }}</span></td><td class="num">{{ g.count }}</td>
+<td class="small">{% if g.claims %}{% for c in g.claims %}<div>{% if c.status %}<span class="tag {{ c.css }}">{{ c.status }}</span> {% endif %}« {{ c.text }} »</div>{% endfor %}{% elif g.others %}<span class="muted">Aucune dans la composition. Ingrédients qui en ont une : {{ g.others|join(', ') }}.</span>{% else %}<span class="muted">Aucune allégation autorisée sur ce thème : retirer ou reformuler.</span>{% endif %}</td>
 <td><details><summary class="small">voir</summary>{% for e in g.examples %}<p class="muted small">… {{ e }} …</p>{% endfor %}</details></td></tr>{% endfor %}</table></div></section>{% endif %}
 
 {% if r.page_level %}<section class="card"><h2>Constats sur l'ensemble de la page</h2>{% for f in r.page_level if f.code != 'IA_INDISPONIBLE' %}
-<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{{ f.explanation }}{% if f.substance %} ({{ f.substance }}){% endif %}{% if f.legal %}<div class="meta">{{ f.legal }}</div>{% endif %}</div></div>{% endfor %}</section>{% endif %}
+<div class="finding"><span class="tag {{ f.css }}">{{ f.level_label }}</span><div class="body">{{ f.explanation }}{% if f.substance %} ({{ f.substance }}){% endif %}{% if f.legal %}<div class="meta">{{ legal(f) }}</div>{% endif %}</div></div>{% endfor %}</section>{% endif %}
 {% if r.recognized %}<section class="card"><h2>Allégations autorisées reconnues sur la page</h2>{% for c in r.recognized %}
 <div class="finding"><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span><div class="body">{{ c.text }} <span class="faint small">({{ c.code }})</span></div></div>{% endfor %}</section>{% endif %}
 {% if r.usable %}<section class="card"><h2>Allégations utilisables pour cette composition</h2>
