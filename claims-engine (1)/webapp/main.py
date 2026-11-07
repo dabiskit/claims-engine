@@ -53,6 +53,10 @@ from lxml import html as lxml_html  # noqa: E402
 
 from engine.conditions import evaluate_claim  # noqa: E402
 from engine.dom_extractor import extract_page  # noqa: E402
+from engine.mode_router import lexical_hits  # noqa: E402
+from engine.page_scope import detect_composition, isolate  # noqa: E402
+from engine.textnorm import norm  # noqa: E402
+from webapp import kb_sync  # noqa: E402
 from eval.pipeline_adapter import KnowledgeBase, ReplayPipeline, product_of  # noqa: E402
 
 APP_NAME = os.environ.get("APP_NAME", "Pré-analyse des allégations")
@@ -63,7 +67,8 @@ MICRO_G = "\u00b5g"
 UNITS = ["mg", MICRO_G, "g"]
 USER_AGENT = "PreAnalyseAllegations/0.1 (demo)"
 
-SEED = json.loads((ROOT / "seed" / "out" / "lot1.json").read_text(encoding="utf-8"))
+BASE_SEED = json.loads((ROOT / "seed" / "out" / "lot1.json").read_text(encoding="utf-8"))
+SEED = BASE_SEED
 KB = KnowledgeBase(SEED)
 AI_ENABLED = bool(os.environ.get("ANTHROPIC_API_KEY"))
 AI_DAILY_LIMIT = int(os.environ.get("AI_DAILY_LIMIT", "40"))
@@ -80,6 +85,17 @@ PIPE = make_pipeline()
 GOLDEN = json.loads((ROOT / "eval" / "golden_set.json").read_text(encoding="utf-8"))
 SUBSTANCES = {s["code"]: s for s in SEED["substances"]}
 LEXICON = {e["code"]: e for e in SEED["lexical_entries"]}
+
+
+def apply_seed(seed: dict) -> None:
+    """Remplace la base en mémoire (base rédigée + import officiel). Les analyses en cours gardent
+    l'ancienne base ; les suivantes utilisent la nouvelle."""
+    global SEED, KB, PIPE, SUBSTANCES, LEXICON
+    kb = KnowledgeBase(seed)
+    SEED, KB = seed, kb
+    SUBSTANCES = {s["code"]: s for s in seed["substances"]}
+    LEXICON = {e["code"]: e for e in seed["lexical_entries"]}
+    PIPE = make_pipeline()
 
 # -----------------------------------------------------------------------------
 # Libellés
@@ -177,7 +193,16 @@ REVIEWS = Table("demo_reviews", MD,
                 Column("target_type", String(40), nullable=False), Column("target_code", String(120), nullable=False),
                 Column("decision", String(20), nullable=False), Column("comment", Text),
                 Column("created_at", DateTime(timezone=True), nullable=False))
+KB_IMPORTS = Table("demo_kb_imports", MD,
+                   Column("id", Integer, primary_key=True), Column("status", String(20), nullable=False),
+                   Column("message", Text), Column("data_json", Text),
+                   Column("started_at", DateTime(timezone=True), nullable=False),
+                   Column("finished_at", DateTime(timezone=True)))
 MD.create_all(ENGINE)
+
+
+def db_backend() -> str:
+    return ENGINE.dialect.name
 
 
 def now() -> datetime:
@@ -318,19 +343,54 @@ def explain(f) -> str:
     return CODE_LABELS.get(f.code, f.code)
 
 
-def run_analysis(source: str, text: str, url: str, mode: str, product_name: str, composition: list[dict]) -> dict:
-    page_url = url if source == "url" else (
-        "https://exemple.invalid/products/demo" if mode == "PRODUCT_PAGE" else "https://exemple.invalid/blogs/demo")
-    html = fetch_url(url) if source == "url" else text_to_html(text)
+def _is_document(html: str) -> bool:
+    return html.lstrip()[:300].lower().startswith(("<!doctype", "<html"))
+
+
+def _substance_names() -> tuple[dict, dict]:
+    aliases = {c: [s["name_fr"], *(a["alias"] for a in s["aliases"] if not a.get("is_ambiguous"))]
+               for c, s in SUBSTANCES.items() if s["kind"] != "PLANTE"}
+    return aliases, {c: s["name_fr"] for c, s in SUBSTANCES.items()}
+
+
+LAST_AI_ERROR: dict = {}
+
+
+def run_analysis(source: str, text: str, url: str, mode: str, product_name: str, composition: list[dict],
+                 fetched_html: str | None = None, use_ai: bool = True) -> dict:
+    """Analyse une page. URL (ou document HTML complet collé) : la page est d'abord réduite à son contenu
+    principal (engine/page_scope.py) ; la composition est détectée si elle n'est pas fournie."""
+    page_url = url if source == "url" and url else (
+        "https://exemple.invalid/products/demo" if mode != "EDITORIAL_BLOG" else "https://exemple.invalid/blogs/demo")
+    raw_html = fetched_html if fetched_html is not None else (fetch_url(url) if source == "url" else text_to_html(text))
+    scope = isolate(raw_html, page_url) if _is_document(raw_html) else None
+    html = scope.html if scope else raw_html
+    info = scope.product if scope else None
+    if mode not in ("PRODUCT_PAGE", "EDITORIAL_BLOG"):
+        mode = "EDITORIAL_BLOG" if info and info.kind == "ARTICLE" else "PRODUCT_PAGE"
+    product_name = product_name or (info.title if info else "") or ""
+
+    doc = html if _is_document(html) else f"<html><head><title></title></head><body><main>{html}</main></body></html>"
+    page = extract_page(doc, page_url)
+    composition_source = "declaree" if composition else None
+    detected = []
+    if not composition:
+        texts = [n.text_plain for n in page.nodes]
+        if info and info.description:
+            texts.append(info.description)
+        aliases, labels = _substance_names()
+        detected = detect_composition(texts, aliases, labels)
+        composition = [{"substance": d.substance, "label": d.label, "amount": d.amount, "unit": d.unit,
+                        "plant_part": None, "preparation": None, "der_ratio": None} for d in detected]
+        composition_source = "detectee" if composition else "absente"
+
     case = {"test_id": "demo", "page_mode": mode, "page_url": page_url,
             "product_names": [product_name] if product_name else [], "portions_per_day": 1,
             "product_composition": composition if mode == "PRODUCT_PAGE" else [],
             "linked_products": [] if mode == "PRODUCT_PAGE" else
             [{"path": "/products/produit-lie", "name": product_name or "produit", "composition": composition}]}
-    analysis = PIPE.analyze(case, html)
-    doc = html if html.lstrip()[:200].lower().startswith(("<!doctype", "<html")) else \
-        f"<html><head><title></title></head><body><main>{html}</main></body></html>"
-    page = extract_page(doc, page_url)
+    pipe = PIPE if use_ai else ReplayPipeline(KB, {"cases": {}})
+    analysis = pipe.analyze(case, html)
     tree = lxml_html.document_fromstring(doc).getroottree()
     flagged_keys = {f.node_key for f in analysis.findings if f.node_key and f.level in ("ROUGE", "ORANGE")}
     red_keys = {f.node_key for f in analysis.findings if f.node_key and f.level == "ROUGE"}
@@ -344,21 +404,46 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
 
     nodes: dict[str, dict] = {}
     page_level = []
+    general_refs: dict[str, dict] = {}
     counts = {k: 0 for k in LEVELS}
+    ai_error = None
+    priorities = []
     for f in analysis.findings:
-        counts[f.level] = counts.get(f.level, 0) + 1
+        if f.code == "IA_INDISPONIBLE":
+            ai_error = f.quote or "erreur inconnue"
+            LAST_AI_ERROR["msg"] = f"{now():%d/%m %H:%M} — {ai_error}"
         item = {"code": f.code, "ai": f.code.startswith("IA_"), "level": f.level, "level_label": LEVELS.get(f.level, (f.level, ""))[0],
                 "css": LEVELS.get(f.level, ("", "info"))[1], "quote": f.quote, "explanation": explain(f),
                 "legal": LEGAL_LABELS.get(f.legal_basis or "", f.legal_basis or ""),
                 "substance": SUBSTANCES.get(f.substance or "", {}).get("name_fr"),
                 "remediations": [REMEDIATIONS.get(r, r) for r in dict.fromkeys(f.remediation_codes)]}
+        if f.code in ("REFERENCE_GENERALE_ART10_3", "IA_REFERENCE_GENERALE") and f.node_key:
+            term = norm(f.quote or "")
+            g = general_refs.setdefault(term, {"term": f.quote, "count": 0, "examples": [], "explanation": item["explanation"],
+                                               "legal": item["legal"]})
+            g["count"] += 1
+            if len(g["examples"]) < 3 and f.node_text not in g["examples"]:
+                g["examples"].append(f.node_text[:220])
+            counts["ORANGE_REF"] = counts.get("ORANGE_REF", 0) + 1
+            continue
+        counts[f.level] = counts.get(f.level, 0) + 1
         if f.node_key is None:
             page_level.append(item)
         else:
-            nodes.setdefault(f.node_key, {"text": f.node_text, "findings": []})["findings"].append(item)
+            key = norm(f.node_text)[:300]          # un même texte répété (menu mobile, bloc dupliqué) : une fois
+            node = nodes.setdefault(key, {"text": f.node_text, "findings": [], "seen": set()})
+            sig = (f.code, norm(f.quote or ""))
+            if sig in node["seen"]:
+                continue
+            node["seen"].add(sig)
+            node["findings"].append(item)
+            if f.level == "ROUGE" and len(priorities) < 6:
+                priorities.append(item)
+    counts["ORANGE"] = counts.get("ORANGE", 0) + counts.get("ORANGE_REF", 0)
 
     recognized = [{"code": r.claim_code, "text": KB.claims[r.claim_code]["text_fr"],
                    "status": USABILITY.get(r.usability, (r.usability, "info"))} for r in analysis.recognized_claims]
+    recognized = list({r["code"]: r for r in recognized}.values())
 
     product = product_of(case, KB, composition)
     usable = []
@@ -374,17 +459,49 @@ def run_analysis(source: str, text: str, url: str, mode: str, product_name: str,
             claims.append({"code": ccode, "text": claim["text_fr"], "status": USABILITY[ev.usability.value],
                            "reasons": [r.reason_fr for r in ev.results if r.condition.type != "MENTION_OBLIGATOIRE"],
                            "notices": [t for _, t in ev.required_notices],
+                           "source": claim.get("text_fr_source_ref"), "source_url": claim.get("source_url"),
                            "variants": [v["text_fr"] for v in KB.variants.get(ccode, []) if not v["is_official_wording"]]})
+        order = {"ok": 0, "cond": 1, "red": 2}
+        claims.sort(key=lambda c: order.get(c["status"][1], 3))
         usable.append({"substance": SUBSTANCES[code]["name_fr"], "amount": item["amount"], "unit": item["unit"],
-                       "claims": claims, "pending_onhold": SUBSTANCES[code]["kind"] == "PLANTE"})
+                       "claims": claims, "pending_onhold": SUBSTANCES[code]["kind"] == "PLANTE",
+                       "n_ok": sum(1 for c in claims if c["status"][1] == "ok")})
 
+    # Substances fréquentes sans allégation autorisée (registre de l'Union) : nom, description, tableaux.
+    label_text = " ".join(filter(None, [product_name, info.description if info else None, info.category if info else None,
+                                        *[n.text_plain for n in page.nodes if n.zone in ("TABLEAU", "TITRE")]]))
+    rejected = kb_sync.rejected_for(SEED, norm(label_text))
+
+    reviews = {"count": 0, "flagged": []}
+    if scope and scope.reviews:
+        reviews["count"] = len(scope.reviews)
+        for rv in scope.reviews:
+            hits = [h for h in lexical_hits(KB.lexicon, rv) if h.entry.severity.get("PRODUIT") == "ROUGE"]
+            if hits:
+                reviews["flagged"].append({"html": str(highlight(rv, [(rv[h.start:h.end], "red") for h in hits])),
+                                           "terms": sorted({rv[h.start:h.end].lower() for h in hits})})
+
+    node_list = []
+    for n in nodes.values():
+        node_list.append({"html": str(highlight(n["text"], [(i["quote"], i["css"]) for i in n["findings"]])),
+                          "findings": n["findings"], "has_red": any(i["level"] == "ROUGE" for i in n["findings"])})
+    node_list.sort(key=lambda n: 0 if n["has_red"] else 1)
+    product_card = None
+    if info:
+        product_card = {"name": info.title, "brand": info.brand, "category": info.category, "image": info.image,
+                        "description": (info.description or "")[:400], "kind": info.kind, "gtin": info.gtin}
     return {"source": url if source == "url" else "Texte collé", "mode": mode, "product_name": product_name,
-            "composition": composition, "counts": counts,
-            "nodes": [{"html": str(highlight(n["text"], [(i["quote"], i["css"]) for i in n["findings"]])),
-                       "findings": n["findings"]} for n in nodes.values()],
-            "page_level": page_level, "recognized": recognized, "usable": usable,
+            "composition": composition, "composition_source": composition_source,
+            "detected": [{"label": d.label, "amount": d.amount, "unit": d.unit, "evidence": d.evidence} for d in detected],
+            "counts": counts, "nodes": node_list, "priorities": priorities,
+            "general_refs": sorted(general_refs.values(), key=lambda g: -g["count"]),
+            "page_level": page_level, "recognized": recognized, "usable": usable, "rejected": rejected,
+            "product": product_card, "reviews": reviews,
+            "scope": {"dropped": scope.dropped_summary() if scope else [], "used_main": bool(scope and scope.used_main),
+                      "nodes": len(page.nodes)},
             "kb_missing": analysis.kb_missing_substances, "kb_release": KB.release,
-            "created": now().strftime("%d/%m/%Y %H:%M"), "flagged": len(nodes_index), "ai": AI_ENABLED,
+            "created": now().strftime("%d/%m/%Y %H:%M"), "flagged": len(nodes_index), "ai": AI_ENABLED and use_ai,
+            "ai_error": ai_error,
             "has_points": any(f.level != "INFO" for f in analysis.findings),
             "models": sorted({u.model for u in analysis.usage}), "usage": [asdict(u) for u in analysis.usage],
             "raw": {"case": case, "findings": [asdict(f) for f in analysis.findings],
@@ -401,7 +518,7 @@ def analyses_today(user_id: int) -> int:
 
 def parse_composition(form) -> list[dict]:
     comp = []
-    for i in range(1, 6):
+    for i in range(1, 9):
         code = (form.get(f"sub_{i}") or "").strip()
         raw = (form.get(f"amount_{i}") or "").strip().replace(",", ".")
         unit = form.get(f"unit_{i}") or "mg"
@@ -462,7 +579,7 @@ T = {
 "base": """<!doctype html><html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
 <title>{{ title }} — {{ app_name }}</title><meta name="robots" content="noindex,nofollow"><style>{{ css }}</style></head><body>
 <header><a class="brand" href="/">{{ app_name }}</a><nav>
-{% if user %}<a href="/app">Analyser</a><a href="/app/base">Base réglementaire</a><a href="/app/avis">Mes avis</a><a href="/tarifs">Tarifs</a>
+{% if user %}<a href="/app">Analyser</a><a href="/app/audit">Audit de site</a><a href="/app/base">Base réglementaire</a><a href="/app/avis">Mes avis</a><a href="/tarifs">Tarifs</a>
 {% if acc.admin %}<a href="/admin">Admin</a>{% endif %}
 <form method="post" action="/deconnexion"><input type="hidden" name="csrf" value="{{ csrf }}"><button class="link">Se déconnecter</button></form>
 {% else %}<a href="/tarifs">Tarifs</a><a href="/connexion">Connexion</a><a class="btn" href="/essai">Essai gratuit</a>{% endif %}</nav></header>
@@ -518,14 +635,16 @@ T = {
 <label style="font-weight:400"><input type="radio" name="source" value="texte" {% if src != 'url' %}checked{% endif %}> Texte ou HTML collé</label>
 <label style="font-weight:400"><input type="radio" name="source" value="url" {% if src == 'url' %}checked{% endif %}> URL publique (sans exécution du JavaScript de la page)</label>
 <label for="text">Texte ou HTML</label><textarea id="text" name="text">{{ prefill.text }}</textarea>
-<label for="url">URL</label><input id="url" name="url" type="url" style="width:100%" placeholder="https://…">
+<label for="url">URL</label><input id="url" name="url" type="url" style="width:100%" placeholder="https://…" value="{{ prefill.url or '' }}">
+<p class="muted">Pour plusieurs pages, un sitemap ou des fichiers : <a href="/app/audit">audit de site</a>.</p>
 <div class="row"><div><label for="mode">Type de page</label><select id="mode" name="mode">
+<option value="AUTO" {% if prefill.mode not in ('PRODUCT_PAGE', 'EDITORIAL_BLOG') %}selected{% endif %}>Détection automatique</option>
 <option value="PRODUCT_PAGE" {% if prefill.mode == 'PRODUCT_PAGE' %}selected{% endif %}>Fiche produit</option>
 <option value="EDITORIAL_BLOG" {% if prefill.mode == 'EDITORIAL_BLOG' %}selected{% endif %}>Article de blog</option></select></div>
 <div><label for="product_name">Nom du produit (facultatif)</label><input id="product_name" name="product_name" value="{{ prefill.product_name }}"></div></div>
-<label>Composition par portion journalière (facultatif, sert à vérifier les doses)</label>
+<label>Composition par portion journalière (facultatif : sinon, elle est détectée dans la page)</label>
 <div class="scroll"><table><tr><th>Ingrédient</th><th>Quantité</th><th>Unité</th></tr>
-{% for i in range(1, 6) %}{% set c = prefill.composition[i-1] if prefill.composition|length >= i else None %}<tr>
+{% for i in range(1, 9) %}{% set c = prefill.composition[i-1] if prefill.composition|length >= i else None %}<tr>
 <td><select name="sub_{{ i }}" aria-label="Ingrédient {{ i }}"><option value="">—</option>{% for s in substances %}<option value="{{ s.code }}" {% if c and c.substance == s.code %}selected{% endif %}>{{ s.name_fr }}</option>{% endfor %}</select></td>
 <td><input name="amount_{{ i }}" inputmode="decimal" size="8" aria-label="Quantité {{ i }}" value="{{ c.amount if c else '' }}"></td>
 <td><select name="unit_{{ i }}" aria-label="Unité {{ i }}">{% for u in units %}<option {% if c and c.unit == u %}selected{% endif %}>{{ u }}</option>{% endfor %}</select></td></tr>{% endfor %}</table></div>
@@ -534,35 +653,78 @@ T = {
 {% endblock %}""",
 
 "result": """{% extends "base" %}{% block content %}
-<p><a href="/app">← Nouvelle analyse</a></p>
-<div class="card"><h1>Résultat de la pré-analyse</h1><p class="muted">{{ r.source }} · {{ 'Fiche produit' if r.mode == 'PRODUCT_PAGE' else 'Article de blog' }} · base {{ r.kb_release }} · {{ r.created }}</p>
-<div class="grid">{% for k, lbl in levels.items() if k != 'INFO' %}<div><span class="tag {{ lbl[1] }}">{{ lbl[0] }}</span><div class="count">{{ r.counts.get(k, 0) }}</div></div>{% endfor %}</div>
+<p><a href="/app">← Nouvelle analyse</a>{% if r.audit_id %} · <a href="/app/audits/{{ r.audit_id }}">← Retour à l'audit</a>{% endif %}</p>
+<div class="card">
+{% if r.product and r.product.name %}<div style="display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap">
+{% if r.product.image %}<img src="{{ r.product.image }}" alt="" style="width:96px;height:96px;object-fit:contain;border:1px solid var(--line);border-radius:8px;background:#fff" referrerpolicy="no-referrer">{% endif %}
+<div style="flex:1;min-width:220px"><p class="muted" style="margin:0">{{ 'Fiche produit détectée' if r.mode == 'PRODUCT_PAGE' else 'Article détecté' }}{% if r.product.brand %} · {{ r.product.brand }}{% endif %}{% if r.product.category %} · {{ r.product.category }}{% endif %}</p>
+<h1 style="margin:4px 0">{{ r.product.name }}</h1>
+<p class="muted" style="margin:0;word-break:break-all">{{ r.source }}</p></div></div>
+{% else %}<h1>Résultat de la pré-analyse</h1><p class="muted">{{ r.source }} · {{ 'Fiche produit' if r.mode == 'PRODUCT_PAGE' else 'Article de blog' }}</p>{% endif %}
+<div class="grid" style="margin-top:12px">{% for k, lbl in levels.items() if k != 'INFO' %}<div><span class="tag {{ lbl[1] }}">{{ lbl[0] }}</span><div class="count">{{ r.counts.get(k, 0) }}</div></div>{% endfor %}</div>
 {% if not r.has_points %}<p>Aucun passage relevé par la pré-analyse automatique sur ce périmètre. Cela ne vaut pas validation.</p>{% endif %}
-{% if r.kb_missing %}<p class="muted">Ingrédients hors de la base actuelle : {{ r.kb_missing|join(', ') }}.</p>{% endif %}
-{% if r.flagged %}<p>{% if ai_enabled %}<form method="post" action="/app/analyses/{{ aid }}/reecrire" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Proposer des réécritures (IA)</button></form> {% endif %}<a class="btn" href="/app/analyses/{{ aid }}/propositions">Propositions et décisions</a></p>{% endif %}
-<p><a href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a></p></div>
-{% for n in r.nodes %}<div class="card"><p>{{ n.html|safe }}</p>
+{% if r.scope and r.scope.used_main %}<p class="muted">Périmètre : contenu principal de la page ({{ r.scope.nodes }} passages).{% if r.scope.dropped %} Écartés : {{ r.scope.dropped|join(', ') }}.{% endif %}{% if r.reviews and r.reviews.count %} Avis clients : {{ r.reviews.count }}, présentés à part.{% endif %}</p>{% endif %}
+<p class="muted">Base {{ r.kb_release }} · {{ r.created }}</p>
+{% if r.flagged %}<p>{% if ai_enabled %}<form method="post" action="/app/analyses/{{ aid }}/reecrire" style="display:inline"><input type="hidden" name="csrf" value="{{ csrf }}"><button>Proposer des réécritures (IA)</button></form> {% endif %}<a class="btn" href="/app/analyses/{{ aid }}/propositions">Propositions et décisions</a> <a href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a></p>{% else %}<p><a href="/app/analyses/{{ aid }}/rapport">Rapport imprimable</a></p>{% endif %}
+</div>
+
+{% if r.composition_source %}<div class="card"><h2>Composition {{ {'declaree': 'déclarée', 'detectee': 'détectée dans la page', 'absente': ''}[r.composition_source] }}</h2>
+{% if r.composition_source == 'detectee' %}<p class="muted">Repérée automatiquement : vérifiez-la. Les doses servent à décider si une allégation est utilisable.</p>
+<ul>{% for d in r.detected %}<li><strong>{{ d.label }}</strong> : {{ d.amount|num }} {{ d.unit }} <span class="muted">— « {{ d.evidence }} »</span></li>{% endfor %}</ul>
+{% elif r.composition_source == 'declaree' %}<ul>{% for c in r.composition %}<li>{{ c.label }} : {{ c.amount|num }} {{ c.unit }}</li>{% endfor %}</ul>
+{% else %}<p class="muted">Aucune quantité d'ingrédient de la base n'a été trouvée dans la page. Sans composition, les allégations ne peuvent pas être vérifiées.</p>{% endif %}
+{% if r.source != 'Texte collé' %}<p><a href="/app?reprise={{ aid }}">Relancer avec une composition corrigée</a></p>{% endif %}</div>{% endif %}
+
+{% if r.rejected %}<div class="card"><h2>Ingrédients sans allégation de santé autorisée</h2>
+{% for x in r.rejected %}<div style="margin:8px 0"><span class="tag red">Aucune allégation autorisée</span> <strong>{{ x.name }}</strong>
+<p>Le registre de l'Union recense {{ x.count }} demande(s) d'allégation refusée(s) pour cet ingrédient. Toute promesse de santé qui lui est attribuée est à revoir.</p>
+<details><summary>Exemples de demandes refusées (texte officiel, en anglais)</summary><ul>{% for e in x.examples %}<li>« {{ e.claim }} » <span class="muted">({{ e.substance }} · {{ e.id }})</span></li>{% endfor %}</ul></details></div>{% endfor %}
+<p class="muted">Source : registre de l'Union des allégations nutritionnelles et de santé (Commission européenne).</p></div>{% endif %}
+
+{% if r.ai_error %}<div class="card muted"><strong>Extraction IA indisponible</strong> : seules les règles et le lexique ont été appliqués. Détail technique : {{ r.ai_error }}</div>{% endif %}
+
+{% if r.priorities %}<div class="card"><h2>À traiter en premier</h2><ol>{% for f in r.priorities %}<li style="margin:6px 0"><strong>« {{ f.quote }} »</strong> — {{ f.explanation }}{% if f.legal %} <span class="muted">({{ f.legal }})</span>{% endif %}</li>{% endfor %}</ol></div>{% endif %}
+
+{% set reds = r.nodes|selectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else r.nodes %}
+{% set others = r.nodes|rejectattr('has_red')|list if r.nodes and r.nodes[0].has_red is defined else [] %}
+{% macro node_card(n) %}<div class="card"><p>{{ n.html|safe }}</p>
 {% for f in n.findings %}<div style="margin:8px 0"><span class="tag {{ f.css }}">{{ f.level_label }}</span>{% if f.ai %} <span class="tag info">IA</span>{% endif %} <strong>« {{ f.quote }} »</strong> — {{ f.explanation }}
 {% if f.legal %}<div class="muted">Fondement : {{ f.legal }}</div>{% endif %}
-{% if f.remediations %}<div class="muted">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div>{% endfor %}</div>{% endfor %}
-{% if r.page_level %}<div class="card"><h2>Constats sur l'ensemble de la page</h2>{% for f in r.page_level %}
+{% if f.remediations %}<div class="muted">Pistes : {{ f.remediations|join(' · ') }}</div>{% endif %}</div>{% endfor %}</div>{% endmacro %}
+{% if reds %}<h2>Passages à revoir en priorité ({{ reds|length }})</h2>{% for n in reds %}{{ node_card(n) }}{% endfor %}{% endif %}
+{% if others %}<details class="card"><summary><strong>Autres passages à revoir ({{ others|length }})</strong></summary>{% for n in others %}{{ node_card(n) }}{% endfor %}</details>{% endif %}
+
+{% if r.general_refs %}<div class="card"><h2>Références générales à la santé ({{ r.general_refs|map(attribute='count')|sum }} mentions)</h2>
+<p class="muted">Un bienfait général (« peau », « articulations », « immunité ») n'est permis que s'il est accompagné d'une allégation autorisée spécifique sur la page (Règl. (CE) 1924/2006, art. 10§3). Regroupées par terme :</p>
+<div class="scroll"><table><tr><th>Terme</th><th>Occurrences</th><th>Exemples</th></tr>{% for g in r.general_refs %}<tr><td><span class="tag orange">{{ g.term }}</span></td><td>{{ g.count }}</td>
+<td><details><summary class="muted">voir</summary>{% for e in g.examples %}<p class="muted">… {{ e }} …</p>{% endfor %}</details></td></tr>{% endfor %}</table></div></div>{% endif %}
+
+{% if r.page_level %}<div class="card"><h2>Constats sur l'ensemble de la page</h2>{% for f in r.page_level if f.code != 'IA_INDISPONIBLE' %}
 <p><span class="tag {{ f.css }}">{{ f.level_label }}</span> {{ f.explanation }}{% if f.substance %} ({{ f.substance }}){% endif %}{% if f.legal %} <span class="muted">— {{ f.legal }}</span>{% endif %}</p>{% endfor %}</div>{% endif %}
 {% if r.recognized %}<div class="card"><h2>Allégations autorisées reconnues sur la page</h2><ul>{% for c in r.recognized %}
 <li><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span> {{ c.text }} <span class="muted">({{ c.code }})</span></li>{% endfor %}</ul></div>{% endif %}
-{% for u in r.usable %}<div class="card"><h2>{{ u.substance }} — {{ u.amount }} {{ u.unit }} par jour</h2>
+{% if r.usable %}<div class="card"><h2>Allégations utilisables pour cette composition</h2>
+{% for u in r.usable %}<details style="border-top:1px solid var(--line);padding:8px 0"><summary><strong>{{ u.substance }}</strong> — {{ u.amount|num }} {{ u.unit }} par jour{% if u.n_ok is defined %} · {{ u.n_ok }} utilisable(s) sur {{ u.claims|length }}{% endif %}</summary>
 {% if u.pending_onhold %}<p class="muted">Plante : les allégations « on-hold » ne sont pas encore intégrées à la base.</p>{% endif %}
 {% for c in u.claims %}<div style="margin:10px 0"><span class="tag {{ c.status[1] }}">{{ c.status[0] }}</span> <strong>{{ c.text }}</strong>
 {% if c.reasons %}<div class="muted">{{ c.reasons|join(' · ') }}</div>{% endif %}
 {% if c.notices %}<div class="muted">Mention à afficher : {{ c.notices|join(' / ') }}</div>{% endif %}
-{% if c.variants and c.status[1] != 'red' %}<details><summary>Formulations validées ({{ c.variants|length }})</summary><ul>{% for v in c.variants %}<li>{{ v }}</li>{% endfor %}</ul></details>{% endif %}</div>{% endfor %}</div>{% endfor %}
-<div class="card muted"><h3>Limites de cette version</h3>{% if r.ai %}<p>Extraction et réécriture IA actives ({{ r.models|join(', ') }}). Les allégations botaniques « on-hold » ne sont pas encore intégrées. La base réglementaire est en brouillon, en cours de validation.</p>{% else %}<p>L'IA n'est pas activée sur cette instance : seules les règles et le lexique ont été appliqués, les promesses implicites ne sont pas détectées.</p>{% endif %}</div>
+{% if c.source %}<div class="muted">Source : {% if c.source_url %}<a href="{{ c.source_url }}" rel="noopener" target="_blank">{{ c.source }}</a>{% else %}{{ c.source }}{% endif %}</div>{% endif %}
+{% if c.variants and c.status[1] != 'red' %}<details><summary>Formulations validées ({{ c.variants|length }})</summary><ul>{% for v in c.variants %}<li>{{ v }}</li>{% endfor %}</ul></details>{% endif %}</div>{% endfor %}</details>{% endfor %}</div>{% endif %}
+{% if r.reviews and r.reviews.count %}<div class="card"><h2>Avis clients ({{ r.reviews.count }})</h2>
+<p class="muted">Écartés de l'analyse principale. Un avis repris et mis en avant par la marque peut toutefois être considéré comme une allégation : {{ r.reviews.flagged|length }} contien(nen)t un terme médical.</p>
+{% if r.reviews.flagged %}<details><summary>Voir les avis concernés</summary>{% for v in r.reviews.flagged %}<p>« {{ v.html|safe }} »</p>{% endfor %}</details>{% endif %}</div>{% endif %}
+<div class="card muted"><h3>Limites de cette version</h3>{% if r.ai %}<p>Extraction et réécriture IA {% if r.ai_error %}indisponibles pour cette analyse{% else %}actives ({{ r.models|join(', ') }}){% endif %}. Les allégations botaniques « on-hold » ne sont pas encore intégrées. La base réglementaire est en cours de validation par un expert.</p>{% else %}<p>L'IA n'est pas activée pour cette analyse : seules les règles et le lexique ont été appliqués, les promesses implicites ne sont pas détectées.</p>{% endif %}</div>
 {% endblock %}""",
 
 "base_index": """{% extends "base" %}{% block content %}<div class="card"><h1>Base réglementaire</h1>
-<p class="muted">Release {{ release }} — brouillon. Chaque élément peut recevoir votre avis ; tout est exportable depuis <a href="/app/avis">Mes avis</a>.</p>
-<p><a href="/app/base/lexique">Lexique des formulations à risque ({{ n_lex }})</a> · <a href="/app/base/mentions">Mentions ({{ n_notices }})</a> · <a href="/app/base/taches">Tâches de revue ({{ n_tasks }})</a></p></div>
-<div class="card scroll"><table><tr><th>Ingrédient</th><th>Type</th><th>Allégations</th><th>Formulations</th><th>Motifs à risque</th><th>Avis donnés</th></tr>
-{% for s in rows %}<tr><td><a href="/app/base/{{ s.code }}">{{ s.name }}</a>{% if s.latin %}<div class="muted"><em>{{ s.latin }}</em></div>{% endif %}</td><td>{{ s.kind }}</td><td>{{ s.claims }}</td><td>{{ s.variants }}</td><td>{{ s.risks }}</td><td>{{ s.reviewed }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
+<p class="muted">Release {{ release }}. {{ n_claims }} allégations autorisées, {{ rows|length }} ingrédients. Chaque élément peut recevoir votre avis ; tout est exportable depuis <a href="/app/avis">Mes avis</a>.</p>
+{% if official %}<p><span class="tag ok">Import officiel</span> Sources officielles téléchargées le {{ official.retrieved_at[:10] }} : {% for src in official.sources %}<a href="{{ src.url }}" rel="noopener" target="_blank">{{ src.name }}</a>{% if src.version %} (version du {{ src.version }}){% endif %}{% if not loop.last %} · {% endif %}{% endfor %}. <a href="/app/base/sources">Détail et mise à jour</a></p>
+{% else %}<p><span class="tag orange">Import officiel non effectué</span> Seule la base rédigée (lot 1) est chargée. <a href="/app/base/sources">Sources et mise à jour</a></p>{% endif %}
+<p><a href="/app/base/lexique">Lexique des formulations à risque ({{ n_lex }})</a> · <a href="/app/base/mentions">Mentions ({{ n_notices }})</a> · <a href="/app/base/taches">Tâches de revue ({{ n_tasks }})</a>{% if n_rejected %} · <a href="/app/base/refusees">Demandes refusées ({{ n_rejected }})</a>{% endif %}</p>
+<p><input id="flt" placeholder="Filtrer les ingrédients…" oninput="for(const tr of document.querySelectorAll('#subs tr[data-n]'))tr.style.display=tr.dataset.n.includes(this.value.toLowerCase())?'':'none'" style="width:100%;max-width:360px"></p></div>
+<div class="card scroll"><table id="subs"><tr><th>Ingrédient</th><th>Type</th><th>Origine</th><th>Allégations</th><th>Formulations</th><th>Motifs à risque</th><th>Avis donnés</th></tr>
+{% for s in rows %}<tr data-n="{{ s.name|lower }}"><td><a href="/app/base/{{ s.code }}">{{ s.name }}</a>{% if s.latin %}<div class="muted"><em>{{ s.latin }}</em></div>{% endif %}</td><td>{{ s.kind }}</td><td><span class="tag {{ 'ok' if s.origin == 'Import officiel' else 'info' }}">{{ s.origin }}</span></td><td>{{ s.claims }}</td><td>{{ s.variants }}</td><td>{{ s.risks }}</td><td>{{ s.reviewed }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 
 "substance": """{% import "macros" as m %}{% extends "base" %}{% block content %}
 <p><a href="/app/base">← Base réglementaire</a></p>
@@ -570,9 +732,10 @@ T = {
 {% if s.nrv_value %}<p>VNR : {{ s.nrv_value }} {{ s.nrv_unit }}</p>{% endif %}
 <p class="muted">Alias reconnus : {{ s.aliases|map(attribute='alias')|join(', ') }}</p>{{ m.review('substance', s.code, rv.get('substance:' ~ s.code), csrf, here) }}</div>
 {% if claims %}<div class="card"><h2>Allégations ({{ claims|length }})</h2>{% for c in claims %}
-<div id="{{ c.code }}" style="border-top:1px solid var(--line);padding:12px 0"><span class="tag {{ 'ok' if c.confidence == 'HAUTE' else 'orange' }}">confiance de saisie : {{ c.confidence }}</span>
+<div id="{{ c.code }}" style="border-top:1px solid var(--line);padding:12px 0">{% if c.origin == 'IMPORT_OFFICIEL' %}<span class="tag ok">texte officiel importé</span>{% else %}<span class="tag {{ 'ok' if c.confidence == 'HAUTE' else 'orange' }}">confiance de saisie : {{ c.confidence }}</span>{% endif %}
 <p><strong>{{ c.text_fr }}</strong> <span class="muted">({{ c.code }} · {{ c.regime }} · {{ c.text_fr_status }})</span></p>
-<p class="muted">Conditions : {% for k in c.conditions %}{{ k.type }}{% if k.params.amount is defined %} {{ k.params.amount }} {{ k.params.unit }} ({{ k.params.basis }}){% endif %}{% if k.notice %} — mention : « {{ k.notice }} »{% endif %}{% if not loop.last %} ; {% endif %}{% endfor %}</p>
+{% if c.source_url %}<p class="muted">Source : <a href="{{ c.source_url }}" rel="noopener" target="_blank">{{ c.text_fr_source_ref }}</a>{% if c.register_id %} · registre de l'Union {{ c.register_id }}{% endif %}{% if c.efsa_ref %} · avis EFSA {{ c.efsa_ref }}{% endif %}</p>{% endif %}
+<p class="muted">Conditions : {% for k in c.conditions %}{% if k.type == 'CONDITION_TEXTE' %}« {{ k.params.text_fr }} »{% elif k.type == 'DOSE_MIN_PORTION' %}dose minimale {{ k.params.amount }} {{ '% de la VNR' if k.params.unit == 'PCT_VNR' else k.params.unit }} ({{ 'par jour' if k.params.basis == 'PORTION_JOURNALIERE' else 'par portion' }}){% else %}{{ k.type }}{% if k.params.amount is defined %} {{ k.params.amount }} {{ k.params.unit }} ({{ k.params.basis }}){% endif %}{% endif %}{% if k.notice %} — mention : « {{ k.notice }} »{% endif %}{% if not loop.last %} ; {% endif %}{% endfor %}</p>
 <details><summary>Formulations ({{ c.variants|length }})</summary><ul>{% for v in c.variants %}<li>{{ v.text_fr }} <span class="muted">({{ v.code }})</span></li>{% endfor %}</ul></details>
 {{ m.review('allegation', c.code, rv.get('allegation:' ~ c.code), csrf, here ~ '#' ~ c.code) }}</div>{% endfor %}</div>{% endif %}
 {% if worklist %}<div class="card"><h2>Allégations « on-hold » à importer</h2><p class="muted">Aucune n'est intégrée. Thèmes à rechercher dans la liste officielle :</p>
@@ -606,12 +769,26 @@ T = {
 <p><a class="btn" href="/app/avis.csv">Exporter en CSV</a></p></div><div class="card scroll"><table><tr><th>Date</th><th>Élément</th><th>Décision</th><th>Commentaire</th></tr>
 {% for r in rows %}<tr><td>{{ r.date }}</td><td>{{ r.target_type }}<div class="muted">{{ r.target_code }}</div></td><td>{{ r.label }}</td><td>{{ r.comment or '' }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 
-"admin": """{% extends "base" %}{% block content %}<div class="card"><h1>Administration</h1><p><a class="btn" href="/admin/avis.csv">Exporter tous les avis (CSV)</a></p></div>
+"admin": """{% extends "base" %}{% block content %}<div class="card"><h1>Administration</h1><p><a class="btn" href="/admin/avis.csv">Exporter tous les avis (CSV)</a> <a href="/admin/banc">Banc d'essai</a> · <a href="/app/base/sources">Base officielle : import et mise à jour</a></p></div>
+<div class="card"><h2>État du service</h2>
+<p>Base de données : {% if diag.db == 'postgresql' %}<span class="tag ok">PostgreSQL</span> {{ diag.db_host }}{% else %}<span class="tag red">SQLite locale</span> — comptes, analyses et avis sont <strong>effacés à chaque redéploiement</strong>. Vérifiez la variable DATABASE_URL (chaîne Supabase « Session pooler »).{% endif %}</p>
+<p>IA : {% if diag.ai %}<span class="tag ok">clé présente</span> modèle {{ diag.model }}{% if diag.last_ai_error %} · dernière erreur : <span class="muted">{{ diag.last_ai_error }}</span>{% endif %}{% else %}<span class="tag orange">désactivée</span> (ANTHROPIC_API_KEY absente){% endif %}</p></div>
 <div class="card scroll"><table><tr><th>E-mail</th><th>Nom</th><th>Créé le</th><th>Fin d'essai</th><th>Analyses</th><th>Avis</th></tr>
 {% for u in rows %}<tr><td>{{ u.email }}</td><td>{{ u.name }}</td><td>{{ u.created }}</td><td>{{ u.ends }}</td><td>{{ u.analyses }}</td><td>{{ u.reviews }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
 }
 
 ENV = Environment(loader=DictLoader(T), autoescape=select_autoescape(default=True, default_for_string=True))
+
+
+def _num(v) -> str:
+    try:
+        f = float(v)
+    except (TypeError, ValueError):
+        return str(v)
+    return (f"{f:.3f}".rstrip("0").rstrip(".") if f != int(f) else str(int(f))).replace(".", ",")
+
+
+ENV.filters["num"] = _num
 
 
 def render(request: Request, name: str, status: int = 200, **ctx) -> HTMLResponse:
@@ -708,15 +885,25 @@ def logout(request: Request, csrf_token: str = Form("", alias="csrf")):
 # Application
 # -----------------------------------------------------------------------------
 @app.get("/app", response_class=HTMLResponse)
-def dashboard(request: Request, exemple: str = ""):
+def dashboard(request: Request, exemple: str = "", reprise: int = 0):
     user, stop = guard(request)
     if stop:
         return stop
-    prefill = next((e for e in EXAMPLES if e["id"] == exemple), {"text": "", "mode": "PRODUCT_PAGE", "product_name": "", "composition": []})
+    prefill = next((e for e in EXAMPLES if e["id"] == exemple), {"text": "", "url": "", "mode": "AUTO", "product_name": "", "composition": []})
+    src = "texte"
+    if reprise:
+        with ENGINE.connect() as c:
+            row = c.execute(select(ANALYSES).where(ANALYSES.c.id == reprise, ANALYSES.c.user_id == user["id"])).mappings().first()
+        if row:
+            r = json.loads(row["result_json"])
+            if r.get("source", "").startswith("http"):
+                prefill = {"text": "", "url": r["source"], "mode": r.get("mode", "AUTO"), "product_name": r.get("product_name", ""),
+                           "composition": [c for c in r.get("composition", []) if c["substance"] in SUBSTANCES]}
+                src = "url"
     with ENGINE.connect() as c:
         recent = c.execute(select(ANALYSES.c.id, ANALYSES.c.title, ANALYSES.c.created_at).where(ANALYSES.c.user_id == user["id"])
                            .order_by(desc(ANALYSES.c.created_at)).limit(10)).mappings().all()
-    return render(request, "app", title="Analyser", examples=EXAMPLES, prefill=prefill, src="texte", error=None,
+    return render(request, "app", title="Analyser", examples=EXAMPLES, prefill=prefill, src=src, error=None,
                   substances=sorted(SUBSTANCES.values(), key=lambda s: s["name_fr"]), units=UNITS,
                   recent=[{"id": a["id"], "title": a["title"], "date": aware(a["created_at"]).strftime("%d/%m %H:%M")} for a in recent])
 
@@ -731,7 +918,9 @@ async def analyse(request: Request):
         return redirect("/app")
     source = form.get("source", "texte")
     text, url = (form.get("text") or "").strip(), (form.get("url") or "").strip()
-    mode = form.get("mode") if form.get("mode") in ("PRODUCT_PAGE", "EDITORIAL_BLOG") else "PRODUCT_PAGE"
+    if url and not text:
+        source = "url"
+    mode = form.get("mode") if form.get("mode") in ("PRODUCT_PAGE", "EDITORIAL_BLOG") else "AUTO"
     product_name = (form.get("product_name") or "").strip()[:200]
     composition = parse_composition(form)
     error = None
@@ -751,10 +940,10 @@ async def analyse(request: Request):
         except httpx.HTTPError:
             error = "Impossible de récupérer la page (délai dépassé ou connexion refusée). Collez son texte à la place."
     if error:
-        prefill = {"text": text, "mode": mode, "product_name": product_name, "composition": composition}
+        prefill = {"text": text, "url": url, "mode": mode, "product_name": product_name, "composition": composition}
         return render(request, "app", 400, title="Analyser", examples=EXAMPLES, prefill=prefill, src=source, error=error,
                       substances=sorted(SUBSTANCES.values(), key=lambda s: s["name_fr"]), units=UNITS, recent=[])
-    title = (product_name or (url if source == "url" else text[:60].replace("\n", " "))) or "Analyse"
+    title = (result.get("product_name") or (url if source == "url" else text[:60].replace("\n", " "))) or "Analyse"
     with ENGINE.begin() as c:
         aid = c.execute(insert(ANALYSES).values(user_id=user["id"], title=title[:300], result_json=json.dumps(result, ensure_ascii=False),
                                                 created_at=now())).inserted_primary_key[0]
@@ -785,10 +974,14 @@ def base_index(request: Request):
         claims = [c for c in SEED["regulatory_claims"] if c["substance"] == s["code"]]
         codes = {c["code"] for c in claims}
         rows.append({"code": s["code"], "name": s["name_fr"], "latin": s["scientific_name"], "kind": s["kind"],
+                     "origin": "Import officiel" if s.get("origin") == "IMPORT_OFFICIEL" else "Base rédigée",
                      "claims": len(claims), "variants": sum(1 for v in SEED["claim_variants"] if v["claim"] in codes),
                      "risks": sum(1 for e in SEED["lexical_entries"] if e.get("substance") == s["code"]),
                      "reviewed": sum(1 for k in rv if k.split(":", 1)[1] in codes or k.split(":", 1)[1] == s["code"])})
+    rows.sort(key=lambda r: norm(r["name"]))
     return render(request, "base_index", title="Base réglementaire", rows=rows, release=KB.release,
+                  official=SEED.get("official_import"), n_claims=len(SEED["regulatory_claims"]),
+                  n_rejected=len(SEED.get("rejected_claims") or []),
                   n_lex=sum(1 for e in SEED["lexical_entries"] if e["category"] not in ("VERBE_EFFET", "THEME_PHYSIOLOGIQUE", "ATTRIBUT_FACTUEL")),
                   n_notices=len(SEED["notices"]), n_tasks=len(SEED["review_items"]))
 
@@ -904,7 +1097,10 @@ def admin(request: Request):
     rows = [{"email": u["email"], "name": u["name"], "created": aware(u["created_at"]).strftime("%d/%m/%Y"),
              "ends": aware(u["trial_ends_at"]).strftime("%d/%m/%Y") if u["trial_ends_at"] else "-",
              "analyses": n_an.get(u["id"], 0), "reviews": n_rv.get(u["id"], 0)} for u in users]
-    return render(request, "admin", title="Administration", rows=rows)
+    from engine.ai import model_for
+    diag = {"db": db_backend(), "db_host": ENGINE.url.host or "", "ai": AI_ENABLED, "model": model_for("extracteur"),
+            "last_ai_error": LAST_AI_ERROR.get("msg")}
+    return render(request, "admin", title="Administration", rows=rows, diag=diag)
 
 
 @app.get("/admin/avis.csv")
@@ -916,3 +1112,5 @@ def admin_csv(request: Request):
 
 
 from webapp import features  # noqa: E402,F401  (routes supplémentaires : réécriture, décisions, rapport, tarifs, banc)
+from webapp import kb_admin  # noqa: E402,F401  (import officiel de la base, demandes refusées)
+from webapp import audit  # noqa: E402,F401  (audit de site : lot d'URL, sitemap, fichiers)
