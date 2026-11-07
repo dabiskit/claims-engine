@@ -159,6 +159,7 @@ def extractor_schema(node_keys: list[str], claim_codes: list[str], substance_cod
     props = schema["properties"]["claims"]["items"]["properties"]
     props["node_key"]["enum"] = node_keys
     props["matched_claim_code"]["enum"] = sorted(claim_codes) + ["AUCUNE"]
+    props["replacement_claim_code"]["enum"] = sorted(claim_codes) + ["AUCUNE"]
     props["substance_code"]["enum"] = sorted(substance_codes) + [None]
     return schema
 
