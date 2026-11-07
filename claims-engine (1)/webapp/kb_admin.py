@@ -168,7 +168,7 @@ def health_base():
     with m.ENGINE.connect() as c:
         row = c.execute(select(m.KB_IMPORTS.c.status, m.KB_IMPORTS.c.message, m.KB_IMPORTS.c.started_at,
                                m.KB_IMPORTS.c.finished_at).order_by(desc(m.KB_IMPORTS.c.id)).limit(1)).mappings().first()
-    return JSONResponse({"db": m.db_backend(), "release": m.KB.release, "claims": len(m.SEED["regulatory_claims"]),
+    return JSONResponse({"db": m.db_backend(), "db_config": m.DB_STATUS.get("config"), "db_detail": m.DB_STATUS.get("detail"), "release": m.KB.release, "claims": len(m.SEED["regulatory_claims"]),
                          "substances": len(m.SEED["substances"]), "rejected": len(m.SEED.get("rejected_claims") or []),
                          "last_import": {"status": row["status"], "message": row["message"],
                                          "started_at": str(row["started_at"]), "finished_at": str(row["finished_at"])} if row else None})

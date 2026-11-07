@@ -167,17 +167,56 @@ USABILITY = {"UTILISABLE": ("Utilisable", "ok"), "CONDITIONNELLE": ("À confirme
 # -----------------------------------------------------------------------------
 # Base de données (comptes, analyses, avis de l'expert)
 # -----------------------------------------------------------------------------
+SQLITE_URL = f"sqlite:///{ROOT / 'webapp' / 'demo.db'}"
+DB_STATUS = {"config": "absente", "detail": ""}   # affiché dans /sante/base et l'administration, sans secret
+
+
 def database_url() -> str:
-    url = os.environ.get("DATABASE_URL", "").strip()
+    """Normalise DATABASE_URL : espaces, guillemets, préfixe « DATABASE_URL= » collé par erreur,
+    mot de passe contenant des caractères spéciaux (encodé), crochets du modèle Supabase."""
+    from urllib.parse import quote, unquote
+    raw = os.environ.get("DATABASE_URL")
+    if raw is None:
+        DB_STATUS.update(config="absente", detail="variable DATABASE_URL non définie")
+        return SQLITE_URL
+    url = raw.strip().strip('"').strip("'").strip()
+    if url.upper().startswith("DATABASE_URL="):
+        url = url.split("=", 1)[1].strip().strip('"').strip("'")
     if not url:
-        return f"sqlite:///{ROOT / 'webapp' / 'demo.db'}"
-    for prefix in ("postgres://", "postgresql://"):
-        if url.startswith(prefix):
-            return "postgresql+psycopg://" + url[len(prefix):]
-    return url
+        DB_STATUS.update(config="vide", detail="variable DATABASE_URL définie mais vide")
+        return SQLITE_URL
+    m_ = re.match(r"^(postgres(?:ql)?(?:\+psycopg)?)://([^:/@]+):(.*)@([^@/]+)(/.*)?$", url)
+    if not m_:
+        DB_STATUS.update(config="invalide", detail="DATABASE_URL ne commence pas par postgresql://utilisateur:motdepasse@hôte")
+        return SQLITE_URL
+    _, user, password, hostport, path = m_.groups()
+    if "[YOUR-PASSWORD]" in password or "MOT_DE_PASSE" in password:
+        DB_STATUS.update(config="invalide", detail="le mot de passe n'a pas été mis à la place de [YOUR-PASSWORD]")
+        return SQLITE_URL
+    if password.startswith("[") and password.endswith("]"):
+        password = password[1:-1]
+    password = quote(unquote(password), safe="")
+    DB_STATUS.update(config="ok", detail=f"hôte {hostport.split(':')[0]}")
+    return f"postgresql+psycopg://{user}:{password}@{hostport}{path or '/postgres'}"
 
 
-ENGINE = create_engine(database_url(), pool_pre_ping=True)
+def _make_engine():
+    url = database_url()
+    if url == SQLITE_URL:
+        return create_engine(url, pool_pre_ping=True)
+    eng = create_engine(url, pool_pre_ping=True, connect_args={"connect_timeout": 10})
+    try:
+        with eng.connect():
+            pass
+        return eng
+    except Exception as exc:  # pas de panne totale : on démarre, et l'erreur est affichée (sans le mot de passe)
+        msg = re.sub(r"://[^@\s]*@", "://***@", str(exc).splitlines()[0])[:300]
+        DB_STATUS.update(config="erreur_connexion", detail=msg)
+        print(f"[db] connexion PostgreSQL impossible : {msg}", flush=True)
+        return create_engine(SQLITE_URL, pool_pre_ping=True)
+
+
+ENGINE = _make_engine()
 MD = MetaData()
 USERS = Table("demo_users", MD,
               Column("id", Integer, primary_key=True), Column("email", String(255), unique=True, nullable=False),
@@ -774,7 +813,7 @@ T = {
 
 "admin": """{% extends "base" %}{% block content %}<div class="card"><h1>Administration</h1><p><a class="btn" href="/admin/avis.csv">Exporter tous les avis (CSV)</a> <a href="/admin/banc">Banc d'essai</a> · <a href="/app/base/sources">Base officielle : import et mise à jour</a></p></div>
 <div class="card"><h2>État du service</h2>
-<p>Base de données : {% if diag.db == 'postgresql' %}<span class="tag ok">PostgreSQL</span> {{ diag.db_host }}{% else %}<span class="tag red">SQLite locale</span> — comptes, analyses et avis sont <strong>effacés à chaque redéploiement</strong>. Vérifiez la variable DATABASE_URL (chaîne Supabase « Session pooler »).{% endif %}</p>
+<p>Base de données : {% if diag.db == 'postgresql' %}<span class="tag ok">PostgreSQL</span> {{ diag.db_host }}{% else %}<span class="tag red">SQLite locale</span> — comptes, analyses et avis sont <strong>effacés à chaque redéploiement</strong>. Cause : {{ diag.db_detail }}. Vérifiez la variable DATABASE_URL (chaîne Supabase « Session pooler »).{% endif %}</p>
 <p>IA : {% if diag.ai %}<span class="tag ok">clé présente</span> modèle {{ diag.model }}{% if diag.last_ai_error %} · dernière erreur : <span class="muted">{{ diag.last_ai_error }}</span>{% endif %}{% else %}<span class="tag orange">désactivée</span> (ANTHROPIC_API_KEY absente){% endif %}</p></div>
 <div class="card scroll"><table><tr><th>E-mail</th><th>Nom</th><th>Créé le</th><th>Fin d'essai</th><th>Analyses</th><th>Avis</th></tr>
 {% for u in rows %}<tr><td>{{ u.email }}</td><td>{{ u.name }}</td><td>{{ u.created }}</td><td>{{ u.ends }}</td><td>{{ u.analyses }}</td><td>{{ u.reviews }}</td></tr>{% endfor %}</table></div>{% endblock %}""",
@@ -1101,7 +1140,7 @@ def admin(request: Request):
              "ends": aware(u["trial_ends_at"]).strftime("%d/%m/%Y") if u["trial_ends_at"] else "-",
              "analyses": n_an.get(u["id"], 0), "reviews": n_rv.get(u["id"], 0)} for u in users]
     from engine.ai import model_for
-    diag = {"db": db_backend(), "db_host": ENGINE.url.host or "", "ai": AI_ENABLED, "model": model_for("extracteur"),
+    diag = {"db": db_backend(), "db_host": ENGINE.url.host or "", "db_detail": DB_STATUS.get("detail"), "ai": AI_ENABLED, "model": model_for("extracteur"),
             "last_ai_error": LAST_AI_ERROR.get("msg")}
     return render(request, "admin", title="Administration", rows=rows, diag=diag)
 
