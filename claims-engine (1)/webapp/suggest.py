@@ -173,8 +173,8 @@ class Suggester:
                 claims.append(self._claim_view(cc))
         others: list[str] = []
         if not claims:
-            # thème de la citation d'abord ; un mot isolé (« prévenir ») prend le thème de sa phrase
-            basis = quote if topics_of(quote or "") or len(q.split()) > 3 else sentence_of(quote, node_text)
+            # thème de la citation d'abord ; à défaut (« prévenir », « leur résistance »), celui de sa phrase
+            basis = quote if topics_of(quote or "") else sentence_of(quote, node_text)
             claims, others = self.claims_for(basis)
         if not (replace_with or advice or claims or others):
             return None
