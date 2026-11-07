@@ -12,6 +12,17 @@ déterministe seul tourne et l'application le dit. Variables : voir `.env.exampl
 - Variables : `DATABASE_URL`, `SESSION_SECRET`, `ADMIN_EMAILS`, `APP_NAME`, `TRIAL_DAYS`
 - Tests : `pytest tests/test_webapp.py`
 
+## Nouveautés (v0.2)
+- **Analyse d'URL centrée sur le produit** (`engine/page_scope.py`) : seul le contenu principal est analysé ; menus, tiroirs,
+  produits suggérés et pied de page sont écartés ; les avis clients sont présentés à part ; la carte produit (schema.org) et la
+  composition sont détectées automatiquement (à vérifier) ; les références générales (« peau », « articulations ») sont regroupées.
+- **Audit de site** (`webapp/audit.py`, `/app/audit`) : liste d'URL, sitemap filtrable, fichiers .docx / .pdf / .html / .txt / .md ;
+  tâche de fond reprise au redémarrage ; tableau de bord trié par risque ; export CSV.
+- **Base officielle importée automatiquement** (`webapp/kb_sync.py`, `webapp/kb_admin.py`, `/app/base/sources`) : annexe du
+  règlement 432/2012 consolidé (EUR-Lex, FR), registre de l'Union (API de la Commission : autorisées, refusées), VNR. Chaque
+  allégation importée cite sa source et la version du texte. Mise à jour par l'administrateur et automatique tous les 7 jours
+  (`KB_SYNC_DAYS`, `AUTO_SYNC=0` pour désactiver). Les plantes « on-hold » ne sont pas dans le registre : non importées.
+
 ## Ordre de chargement
 1. `db/001_schema.sql` — schéma `kb` (base réglementaire) et `app` (analyses, audit trail)
 2. `db/003_seed_support.sql` — file de revue, liste de travail botanique, motifs de risque
