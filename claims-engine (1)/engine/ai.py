@@ -60,15 +60,34 @@ class AnthropicClient:
             raise LLMError("ANTHROPIC_API_KEY manquante")
         self.http = httpx.Client(timeout=timeout, transport=transport)
         self.max_retries = max_retries
+        self.auto_tool_models: set[str] = set()   # modèles qui refusent l'appel d'outil forcé
 
     def call_tool(self, *, stage: str, model: str, system: str, user_content: str, tool_name: str,
                   tool_description: str, input_schema: dict, max_tokens: int = 4096) -> tuple[dict, LLMUsage]:
+        """Appel d'outil forcé (tool_choice = tool). Certains modèles le refusent (« tool_choice … not supported
+        for this model ») : on rebascule alors en tool_choice = auto avec une consigne explicite, et on le
+        mémorise pour ce modèle. La sortie reste validée par le JSON Schema côté serveur."""
+        forced = model not in self.auto_tool_models
+        try:
+            return self._call(stage, model, system, user_content, tool_name, tool_description, input_schema, max_tokens, forced)
+        except LLMError as exc:
+            if forced and "tool_choice" in str(exc):
+                self.auto_tool_models.add(model)
+                return self._call(stage, model, system, user_content, tool_name, tool_description, input_schema,
+                                  max_tokens, False)
+            raise
+
+    def _call(self, stage, model, system, user_content, tool_name, tool_description, input_schema, max_tokens,
+              forced: bool) -> tuple[dict, LLMUsage]:
+        sys_text = system if forced else (
+            system + f"\n\nIMPORTANT : réponds uniquement en appelant l'outil « {tool_name} », une seule fois, "
+                     "sans texte autour.")
         body = {
             "model": model, "max_tokens": max_tokens,
-            "system": [{"type": "text", "text": system, "cache_control": {"type": "ephemeral"}}],
+            "system": [{"type": "text", "text": sys_text, "cache_control": {"type": "ephemeral"}}],
             "messages": [{"role": "user", "content": user_content}],
             "tools": [{"name": tool_name, "description": tool_description, "input_schema": input_schema}],
-            "tool_choice": {"type": "tool", "name": tool_name},
+            "tool_choice": {"type": "tool", "name": tool_name} if forced else {"type": "auto"},
         }
         headers = {"x-api-key": self.api_key, "anthropic-version": API_VERSION, "content-type": "application/json"}
         delay, last = 2.0, "aucune réponse"
@@ -95,10 +114,34 @@ class AnthropicClient:
                              int(u.get("input_tokens") or 0) + cached + int(u.get("cache_creation_input_tokens") or 0),
                              cached, int(u.get("output_tokens") or 0), time.perf_counter() - t0)
             block = next((b for b in data.get("content", []) if b.get("type") == "tool_use" and b.get("name") == tool_name), None)
-            if block is None or not isinstance(block.get("input"), dict):
-                raise LLMError("Réponse sans appel d'outil exploitable", [usage])
-            return block["input"], usage
+            if block is not None and isinstance(block.get("input"), dict):
+                return block["input"], usage
+            # Sans appel d'outil (mode auto) : un objet JSON dans le texte est accepté, puis validé par le schéma.
+            text = "".join(b.get("text", "") for b in data.get("content", []) if b.get("type") == "text")
+            parsed = _json_in_text(text)
+            if parsed is not None:
+                return parsed, usage
+            raise LLMError("Réponse sans appel d'outil exploitable", [usage])
         raise LLMError(f"Échec après {self.max_retries} tentatives ({last})")
+
+
+def _json_in_text(text: str) -> dict | None:
+    start = text.find("{")
+    while start != -1:
+        depth = 0
+        for i in range(start, len(text)):
+            if text[i] == "{":
+                depth += 1
+            elif text[i] == "}":
+                depth -= 1
+                if depth == 0:
+                    try:
+                        obj = json.loads(text[start:i + 1])
+                        return obj if isinstance(obj, dict) else None
+                    except json.JSONDecodeError:
+                        break
+        start = text.find("{", start + 1)
+    return None
 
 
 def _validated(out: dict, schema: dict, stage: str, usage: LLMUsage) -> dict:
